@@ -6,7 +6,7 @@ cd "$(dirname "$0")"
 JAR="$PWD/dist/ModLoader-v1.0.0-vgame-0.0.8-client.jar"
 [ -f "$JAR" ] || ./build.sh
 HOME_DIR="${OPENVOXEL_HOME:-}"
-for c in ../.. .. .; do
+for c in ../../.. ../.. .. .; do
   [ -z "$HOME_DIR" ] && { [ -f "$c/OpenVoxelLauncher-linux64" ] || [ -f "$c/OpenVoxelLauncher" ]; } && HOME_DIR="$(cd "$c" && pwd)"
 done
 if [ -z "$HOME_DIR" ]; then

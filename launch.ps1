@@ -5,7 +5,7 @@ Set-Location $root
 $jar = Join-Path $root 'dist\ModLoader-v1.0.0-vgame-0.0.8-client.jar'
 if (!(Test-Path $jar)) { & cmd /c build.bat; if ($LASTEXITCODE -ne 0) { throw 'Build failed' } }
 $home_ = $env:OPENVOXEL_HOME
-foreach ($c in @('..\..', '..', '.')) { if (-not $home_ -and (Test-Path (Join-Path $root "$c\OpenVoxelLauncher.exe"))) { $home_ = (Resolve-Path (Join-Path $root $c)).Path } }
+foreach ($c in @('..\..\..', '..\..', '..', '.')) { if (-not $home_ -and (Test-Path (Join-Path $root "$c\OpenVoxelLauncher.exe"))) { $home_ = (Resolve-Path (Join-Path $root $c)).Path } }
 if (-not $home_) {
     Write-Host 'EN: OpenVoxelLauncher.exe not found. Set OPENVOXEL_HOME to the launcher folder.'
     Write-Host 'ES: No se encontró OpenVoxelLauncher.exe. Define OPENVOXEL_HOME con la carpeta del launcher.'

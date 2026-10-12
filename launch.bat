@@ -7,6 +7,7 @@ set "JAR=%~dp0dist\ModLoader-v1.0.0-vgame-0.0.8-client.jar"
 if not exist "%JAR%" call build.bat
 if not exist "%JAR%" ( echo Build failed. & pause & exit /b 1 )
 set "HOME_DIR=%OPENVOXEL_HOME%"
+if "%HOME_DIR%"=="" if exist "..\..\..\OpenVoxelLauncher.exe" set "HOME_DIR=%~dp0..\..\.."
 if "%HOME_DIR%"=="" if exist "..\..\OpenVoxelLauncher.exe" set "HOME_DIR=%~dp0..\.."
 if "%HOME_DIR%"=="" if exist "..\OpenVoxelLauncher.exe" set "HOME_DIR=%~dp0.."
 if "%HOME_DIR%"=="" if exist "%~dp0OpenVoxelLauncher.exe" set "HOME_DIR=%~dp0."
