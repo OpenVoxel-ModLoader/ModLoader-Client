@@ -21,3 +21,7 @@ instance/logs/*
 !instance/README.md
 !instance/sounds/README.md
 !instance/music/README.md
+bin/
+.settings/
+.project
+.classpath
