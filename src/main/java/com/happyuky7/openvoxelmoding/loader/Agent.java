@@ -59,6 +59,7 @@ public final class Agent {
         ready.start();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             Settings.save();
+            context.saveConfigs();
             for (ClientMod mod : MODS) try { mod.onShutdown(context); }
             catch (Throwable error) { error.printStackTrace(); }
         }, "ModLoader-Shutdown"));
