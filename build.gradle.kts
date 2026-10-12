@@ -4,7 +4,7 @@ plugins {
 
 group = "com.happyuky7.openvoxelmoding"
 val loaderVersion = "1.0.0"
-val gameVersion = "0.8.0"
+val gameVersion = "0.0.8"
 version = loaderVersion
 
 // Compile-only dependency on the game JAR. Set OPENVOXEL_GAME_JAR or place the game next to
