@@ -1,0 +1,308 @@
+package com.happyuky7.openvoxelmoding.loader;
+
+import net.openvoxel.client.ClientMain;
+import net.openvoxel.client.SessionInfo;
+import net.openvoxel.engine.VoxelEngine;
+import net.openvoxel.engine.input.InputHandler;
+import net.openvoxel.engine.rendering.Renderer;
+import net.openvoxel.engine.rendering.Texture;
+import net.openvoxel.engine.ui.ChatHud;
+import net.openvoxel.engine.ui.GLUIRenderer;
+import net.openvoxel.engine.world.block.BlockState;
+import net.openvoxel.engine.world.block.BlockType;
+
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.lang.reflect.Field;
+import java.net.InetAddress;
+import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Targets of the bytecode wrappers installed by {@link Transformer}. Every method here
+ * receives the original arguments and can call the renamed original through {@link #orig}.
+ * Must stay public: it is invoked from game classes.
+ */
+public final class Hooks {
+    private static final Map<String, MethodHandle> CACHE = new ConcurrentHashMap<>();
+    private Hooks() {}
+
+    private static MethodHandle orig(String cls, String name, boolean isStatic, Class<?> ret, Class<?>... args) {
+        return handle(cls, name + "$orig", isStatic, ret, args);
+    }
+
+    private static MethodHandle handle(String cls, String name, boolean isStatic, Class<?> ret, Class<?>... args) {
+        String key = cls + "#" + name;
+        MethodHandle handle = CACHE.get(key);
+        if (handle != null) return handle;
+        try {
+            Class<?> owner = Class.forName(cls, false, ClassLoader.getSystemClassLoader());
+            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(owner, MethodHandles.lookup());
+            MethodType type = MethodType.methodType(ret, args);
+            handle = isStatic ? lookup.findStatic(owner, name, type) : lookup.findVirtual(owner, name, type);
+            CACHE.put(key, handle);
+            return handle;
+        } catch (Throwable error) {
+            throw new IllegalStateException("method not found: " + key, error);
+        }
+    }
+
+    private static RuntimeException rethrow(Throwable t) {
+        if (t instanceof RuntimeException) return (RuntimeException) t;
+        if (t instanceof Error) throw (Error) t;
+        return new RuntimeException(t);
+    }
+
+    /** Replaces GLFW.glfwGetKey inside the engine's InputHandler so controls can be rebound. */
+    public static int glfwGetKey(long window, int key) {
+        return org.lwjgl.glfw.GLFW.glfwGetKey(window, Keybinds.remap(key));
+    }
+
+    // ---- GLUIRenderer / widgets --------------------------------------------------------
+
+    static void drawTextOrig(String text, float x, float y, float r, float g, float b, float a) {
+        try { orig("net.openvoxel.engine.ui.GLUIRenderer", "drawText", true, void.class, String.class, float.class, float.class, float.class, float.class, float.class, float.class).invoke(text, x, y, r, g, b, a); }
+        catch (Throwable t) { throw rethrow(t); }
+    }
+
+    static float textWidthOrig(String text) {
+        try { return (float) orig("net.openvoxel.engine.ui.GLUIRenderer", "getTextWidth", true, float.class, String.class).invoke(text); }
+        catch (Throwable t) { throw rethrow(t); }
+    }
+
+    public static void drawText(String text, float x, float y, float r, float g, float b, float a) {
+        ChatColors.drawText(text, x, y, r, g, b, a);
+    }
+
+    public static float getTextWidth(String text) {
+        return textWidthOrig(ChatColors.raw ? text : ChatColors.strip(text));
+    }
+
+    /** Text fields show formatting codes literally; they are only coloured once printed in chat. */
+    public static void textFieldRender(Object field) {
+        ChatColors.raw = true;
+        try { orig("net.openvoxel.engine.ui.widgets.TextField", "renderWidget", false, void.class).invoke(field); }
+        catch (Throwable t) { throw rethrow(t); }
+        finally { ChatColors.raw = false; }
+    }
+
+    public static void chatKey(Object screen, int key) {
+        try { if (Chat.onKey(screen, key)) return; } catch (Throwable error) { System.err.println("[ModLoader] chat key: " + error); }
+        try { orig("net.openvoxel.engine.ui.widgets.ChatScreen", "onKeyPress", false, void.class, int.class).invoke(screen, key); }
+        catch (Throwable t) { throw rethrow(t); }
+    }
+
+    public static void chatRender(VoxelEngine engine) {
+        if (ChatHud.isInputOpen() && engine.isWorldActive()) {
+            try { Chat.render(engine); return; } catch (Throwable error) { System.err.println("[ModLoader] chat render: " + error); }
+        }
+        try { orig("net.openvoxel.engine.ui.ChatHud", "render", true, void.class, VoxelEngine.class).invoke(engine); }
+        catch (Throwable t) { throw rethrow(t); }
+    }
+
+    public static ByteBuffer fontData() {
+        try {
+            Path custom = Agent.instanceDir().resolve("config").resolve("font.ttf");
+            if (Files.isRegularFile(custom)) {
+                byte[] data = Files.readAllBytes(custom);
+                ByteBuffer buffer = org.lwjgl.system.MemoryUtil.memAlloc(data.length);
+                buffer.put(data).flip();
+                System.out.println("[ModLoader] Using custom font " + custom);
+                return buffer;
+            }
+        } catch (Throwable error) { System.err.println("[ModLoader] Custom font failed: " + error); }
+        try { return (ByteBuffer) orig("net.openvoxel.engine.ui.GLUIRenderer", "createDefaultFontData", true, ByteBuffer.class).invoke(); }
+        catch (Throwable t) { throw rethrow(t); }
+    }
+
+    // ---- Physics / rendering -----------------------------------------------------------
+
+    public static void physicsTick(Object physics, float delta, boolean jump, boolean crouch) {
+        if (GameMode.skipPhysics()) return;
+        try { orig("net.openvoxel.engine.physics.PhysicsEngine", "tick", false, void.class, float.class, boolean.class, boolean.class).invoke(physics, delta, jump, crouch); }
+        catch (Throwable t) { throw rethrow(t); }
+    }
+
+    public static void moveHorizontal(Object physics, double dx, double dz, double height) {
+        double[] clamped;
+        try { clamped = GameMode.sneakClamp(dx, dz); } catch (Throwable error) { clamped = new double[]{dx, dz}; }
+        try { orig("net.openvoxel.engine.physics.PhysicsEngine", "moveHorizontal", false, void.class, double.class, double.class, double.class).invoke(physics, clamped[0], clamped[1], height); }
+        catch (Throwable t) { throw rethrow(t); }
+    }
+
+    public static void renderWorld(Object renderer, InputHandler input) {
+        try { Lighting.beforeRender((Renderer) renderer); } catch (Throwable error) { Lighting.reportOnce(error); }
+        try { orig("net.openvoxel.engine.rendering.Renderer", "render", false, void.class, InputHandler.class).invoke(renderer, input); }
+        catch (Throwable t) { throw rethrow(t); }
+        try { HandRenderer.render((Renderer) renderer); }
+        catch (Throwable error) { HandRenderer.reportOnce(error); }
+    }
+
+    /** After the engine compiles its chunk shader, swap in the ModLoader one (fog, tone curve). */
+    public static void setupShaders(Object renderer) {
+        try { orig("net.openvoxel.engine.rendering.Renderer", "setupShaders", false, void.class).invoke(renderer); }
+        catch (Throwable t) { throw rethrow(t); }
+        try { Lighting.install((Renderer) renderer); } catch (Throwable error) { Lighting.reportOnce(error); }
+    }
+
+    private static Field textureFilepath;
+
+    /** Resource-pack override: {@code client/instance/resourcepacks/<pack>/<filepath>}. */
+    public static void textureDecode(Object texture) {
+        try {
+            if (!Settings.resourcePack.isEmpty()) {
+                if (textureFilepath == null) { textureFilepath = Texture.class.getDeclaredField("filepath"); textureFilepath.setAccessible(true); }
+                String path = (String) textureFilepath.get(texture);
+                if (path != null && !path.startsWith("<")) {
+                    Path override = Agent.instanceDir().resolve("resourcepacks").resolve(Settings.resourcePack).resolve(path.replaceFirst("^\\./", ""));
+                    if (Files.isRegularFile(override)) {
+                        byte[] png = Files.readAllBytes(override);
+                        handle("net.openvoxel.engine.rendering.Texture", "decodeFromBytes", false, void.class, byte[].class).invoke(texture, png);
+                        return;
+                    }
+                }
+            }
+        } catch (Throwable error) { System.err.println("[ModLoader] texture override failed: " + error); }
+        try { orig("net.openvoxel.engine.rendering.Texture", "decode", false, void.class).invoke(texture); }
+        catch (Throwable t) { throw rethrow(t); }
+    }
+
+    public static void debugRender(VoxelEngine engine) {
+        try { DebugScreen.render(engine); }
+        catch (Throwable error) { DebugScreen.reportOnce(error); }
+    }
+
+    public static void statusRender(VoxelEngine e) {
+        boolean alive = e.isWorldActive() && e.getLocalPlayer() != null && !e.getLocalPlayer().dead;
+        if (alive && Settings.isCreative()) return;
+        if (alive) {
+            int[] aspect = e.getCamera() != null ? e.getCamera().getAspect() : new int[]{1280, 720};
+            GLUIRenderer.setup2DRendering(aspect[0], aspect[1]);
+            try { Survival.renderHud(e, aspect[0], aspect[1]); } finally { GLUIRenderer.restore3DRendering(); }
+            return;
+        }
+        try { orig("net.openvoxel.engine.ui.StatusHud", "render", true, void.class, VoxelEngine.class).invoke(e); }
+        catch (Throwable t) { throw rethrow(t); }
+    }
+
+    // ---- Engine ------------------------------------------------------------------------
+
+    public static void sendChat(Object engine, String message) {
+        Chat.recordSent(message);
+        if (message != null && message.startsWith("/") && ClientCommands.handle(message)) return;
+        try { orig("net.openvoxel.engine.VoxelEngine", "sendChat", false, void.class, String.class).invoke(engine, message); }
+        catch (Throwable t) { throw rethrow(t); }
+    }
+
+    /** Right clicks on tiles (crafting table, chest, bed) and tile placement go through {@link Tiles}. */
+    public static void fireEvent(Object manager, net.openvoxel.engine.events.GameEvent event) {
+        VoxelEngine e = VoxelEngine.getEngine();
+        boolean tilePlacement = false;
+        try {
+            if (event instanceof net.openvoxel.engine.events.player.ClickEvent && e != null) {
+                net.openvoxel.engine.events.player.ClickEvent click = (net.openvoxel.engine.events.player.ClickEvent) event;
+                if (click.type == net.openvoxel.engine.events.player.ClickEvent.ClickType.RIGHT) {
+                    if (Tiles.onRightClick(e, click)) return;
+                    tilePlacement = Tiles.pendingPlace != null;
+                }
+            }
+        } catch (Throwable error) { System.err.println("[ModLoader] tile click: " + error); }
+        try { orig("net.openvoxel.engine.events.GameEventManager", "fire", false, void.class, net.openvoxel.engine.events.GameEvent.class).invoke(manager, event); }
+        catch (Throwable t) { throw rethrow(t); }
+        finally { if (tilePlacement && e != null) Tiles.finishPlace(e); }
+    }
+
+    /** Survival: breaks only after the mining timer (see {@link Mining}), drops go to the inventory, placing consumes stacks. */
+    public static void applyEdit(Object engine, int x, int y, int z, net.openvoxel.engine.world.AbstractBlock block) {
+        VoxelEngine e = (VoxelEngine) engine;
+        BlockType before = null;
+        boolean active = e.isWorldActive() && e.getWorld() != null && block != null;
+        if (active) {
+            try { before = BlockType.fromId(BlockState.typeId(e.getWorld().getState(x, y, z))); } catch (Exception ignored) { active = false; }
+        }
+        boolean survival = active && !Settings.isCreative();
+        if (survival && block.getType() == BlockType.AIR && !Mining.approved) return; // instant click: wait for the timer
+        try { orig("net.openvoxel.engine.VoxelEngine", "applyEdit", false, void.class, int.class, int.class, int.class, net.openvoxel.engine.world.AbstractBlock.class).invoke(engine, x, y, z, block); }
+        catch (Throwable t) { throw rethrow(t); }
+        if (!active || before == null) return;
+        try {
+            if (block.getType() == BlockType.AIR) {
+                if (survival && before != BlockType.AIR) Mining.onBroken(before, x, y, z);
+                else if (before != BlockType.AIR) { Items.Stack tile = Tiles.onBlockBroken(x, y, z); if (tile != null) Drops.spawn(tile, x, y, z); }
+            } else if (block.getType() != before) {
+                if (Tiles.pendingPlace != null && block.getType() == Tiles.pendingPlace.base) Tiles.register(e, x, y, z);
+                else if (survival) { Items.Stack held = BuiltinUI.held(); if (held != null && held.block == block.getType()) Mining.onPlaced(); }
+            }
+        } catch (Throwable error) { System.err.println("[ModLoader] inventory edit: " + error); }
+    }
+
+    public static void applyServerHealth(Object engine, float health, boolean dead) {
+        if (Settings.isCreative()) { health = 20f; dead = false; }
+        try { orig("net.openvoxel.engine.VoxelEngine", "applyServerHealth", false, void.class, float.class, boolean.class).invoke(engine, health, dead); }
+        catch (Throwable t) { throw rethrow(t); }
+    }
+
+    // ---- Client ------------------------------------------------------------------------
+
+    /**
+     * The 0.0.8-Debug client aborts a multiplayer join when the auth server answers
+     * "invalid session" to /session/join, even for LAN servers in offline mode. Skip the
+     * intent for local addresses and never block the join on auth failures: an online-mode
+     * server still rejects bad tokens itself with a clear kick reason.
+     */
+    public static String registerJoinIntent(String serverId) {
+        String host = serverId;
+        int colon = host.lastIndexOf(':');
+        if (colon > 0) host = host.substring(0, colon);
+        if (isLocalHost(host)) {
+            System.out.println("[ModLoader] Local server " + serverId + ": skipping /session/join");
+            return null;
+        }
+        SessionInfo session = ClientMain.getSession();
+        if (session == null || !session.isLoggedIn()) return null;
+        String error;
+        try { error = (String) orig("net.openvoxel.client.ClientMain", "registerJoinIntent", true, String.class, String.class).invoke(serverId); }
+        catch (Throwable t) { error = String.valueOf(t.getMessage()); }
+        if (error != null) {
+            System.out.println("[ModLoader] /session/join failed (" + error + "); joining anyway");
+            ChatHud.addLine(Lang.t("chat.session", error));
+        }
+        return null;
+    }
+
+    static boolean isLocalHost(String host) {
+        if (host == null || host.isEmpty()) return true;
+        String h = host.trim().toLowerCase();
+        if (h.equals("localhost") || h.endsWith(".local") || h.endsWith(".lan")) return true;
+        try {
+            InetAddress address = InetAddress.getByName(h);
+            return address.isLoopbackAddress() || address.isSiteLocalAddress() || address.isLinkLocalAddress() || address.isAnyLocalAddress();
+        } catch (Exception ignored) { return false; }
+    }
+
+    public static void appearanceApply(String base, byte[] skin, String modelJson, String uuid) {
+        try {
+            if (Skins.applyFromServer(skin, modelJson, uuid)) return;
+        } catch (Throwable error) { System.err.println("[HappySkins] " + error); }
+        try { orig("net.openvoxel.client.net.AppearanceLoader", "apply", true, void.class, String.class, byte[].class, String.class, String.class).invoke(base, skin, modelJson, uuid); }
+        catch (Throwable t) { throw rethrow(t); }
+    }
+
+    public static void mainMenuBuild(Object screen, float w, float h) {
+        try { Screens.buildMainMenu((net.openvoxel.engine.ui.widgets.Screen) screen, w, h); return; }
+        catch (Throwable error) { System.err.println("[HappyUI] main menu: " + error); error.printStackTrace(); }
+        try { orig("net.openvoxel.client.MainMenuScreen", "build", false, void.class, float.class, float.class).invoke(screen, w, h); }
+        catch (Throwable t) { throw rethrow(t); }
+    }
+
+    public static void pauseMenuBuild(Object screen, float w, float h) {
+        try { Screens.buildPauseMenu((net.openvoxel.engine.ui.widgets.Screen) screen, w, h); return; }
+        catch (Throwable error) { System.err.println("[HappyUI] pause menu: " + error); error.printStackTrace(); }
+        try { orig("net.openvoxel.engine.ui.PauseMenu", "build", false, void.class, float.class, float.class).invoke(screen, w, h); }
+        catch (Throwable t) { throw rethrow(t); }
+    }
+}

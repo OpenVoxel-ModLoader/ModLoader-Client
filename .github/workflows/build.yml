@@ -1,0 +1,35 @@
+name: Build client loader
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      # The game JAR is not redistributed here: download it from the official manifest.
+      - name: Fetch game JAR
+        run: |
+          mkdir -p game
+          curl -sSL -o game/openvoxel.jar https://open-voxel.net/jars/openvoxel-0.0.8-Debug.jar
+      - name: Build
+        run: ./gradlew --no-daemon jar
+        env:
+          OPENVOXEL_GAME_JAR: game/openvoxel.jar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ModLoader-client
+          path: dist/*.jar
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.jar

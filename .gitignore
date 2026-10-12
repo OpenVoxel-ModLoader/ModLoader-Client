@@ -1,0 +1,23 @@
+# build output
+build/
+dist/
+.gradle/
+*.iml
+.idea/
+.vscode/
+
+# the game jar is never committed (OPENVOXEL_GAME_JAR)
+game/
+
+# per-user instance data; folders are kept with .gitkeep
+instance/mods/*
+instance/config/*
+instance/lang/*
+instance/resourcepacks/*
+instance/sounds/*
+instance/music/*
+instance/logs/*
+!instance/**/.gitkeep
+!instance/README.md
+!instance/sounds/README.md
+!instance/music/README.md
