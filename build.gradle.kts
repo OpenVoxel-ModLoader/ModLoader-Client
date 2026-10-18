@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "com.happyuky7.openvoxelmoding"
-val loaderVersion = "1.1.0-pre1"
+val loaderVersion = "1.1.0-pre2"
 val gameVersion = "0.0.8"
 version = loaderVersion
 

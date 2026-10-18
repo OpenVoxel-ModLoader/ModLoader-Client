@@ -2,7 +2,7 @@
 rem Plain-javac build (no Gradle needed). Equivalent to: gradlew.bat jar
 setlocal
 cd /d "%~dp0"
-set "OUT=dist\ModLoader-v1.1.0-pre1-vgame-0.0.8-client.jar"
+set "OUT=dist\ModLoader-v1.1.0-pre2-vgame-0.0.8-client.jar"
 set "GAME=%OPENVOXEL_GAME_JAR%"
 if "%GAME%"=="" if exist "..\..\..\Game\versions\0.0.8-Debug\openvoxel-0.0.8-Debug.jar" set "GAME=..\..\..\Game\versions\0.0.8-Debug\openvoxel-0.0.8-Debug.jar"
 if "%GAME%"=="" if exist "..\..\Game\versions\0.0.8-Debug\openvoxel-0.0.8-Debug.jar" set "GAME=..\..\Game\versions\0.0.8-Debug\openvoxel-0.0.8-Debug.jar"

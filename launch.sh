@@ -3,7 +3,7 @@
 # Game location: OPENVOXEL_HOME, or the folder that contains this repo (../.. or ..).
 set -euo pipefail
 cd "$(dirname "$0")"
-JAR="$PWD/dist/ModLoader-v1.1.0-pre1-vgame-0.0.8-client.jar"
+JAR="$PWD/dist/ModLoader-v1.1.0-pre2-vgame-0.0.8-client.jar"
 [ -f "$JAR" ] || ./build.sh
 HOME_DIR="${OPENVOXEL_HOME:-}"
 for c in ../../.. ../.. .. .; do
@@ -21,7 +21,7 @@ export OPENVOXEL_MODS_DIR="$PWD/instance"
 export JAVA_TOOL_OPTIONS="-javaagent:$JAR"
 cat <<EOF
 ============================================================
- OpenVoxel ModLoader 1.1.0-pre1 (game 0.0.8)
+ OpenVoxel ModLoader 1.1.0-pre2 (game 0.0.8)
  EN: In the launcher select version "0.0.8-Debug" and press PLAY.
  ES: En el launcher selecciona la versión "0.0.8-Debug" y pulsa PLAY.
  Mods: instance/mods   Settings: instance/config
