@@ -94,7 +94,7 @@ final class BuiltinUI {
         Survival.tick(engine, dt);
         Mining.tick(engine, dt);
         Drops.tick(engine, dt);
-        Tiles.tick(dt);
+        Tiles.tick(engine, dt);
         Net.tick(engine);
         Mobs.tick(engine, dt);
         HandRenderer.tick(engine);
@@ -116,10 +116,10 @@ final class BuiltinUI {
         }
         if (!engine.isWorldActive() || engine.getCamera() == null) return;
         Camera camera = engine.getCamera();
-        // Middle-click pick puts the block into the active hotbar slot, like Minecraft.
+        // Keep the engine's hand in sync with the hotbar (middle click is handled by PickBlock).
         AbstractBlock inHand = camera.getBlockInHand();
         BlockType expected = HOTBAR[selected] != null && HOTBAR[selected].isBlock() ? HOTBAR[selected].block : BlockType.AIR;
-        if (inHand != null && inHand.getType() != null && inHand.getType() != BlockType.AIR && inHand.getType() != expected) HOTBAR[selected] = Items.Stack.of(inHand.getType());
+        if (Tiles.pendingPlace == null && (inHand == null || inHand.getType() != expected)) select(engine, selected);
         if (UIManager.get().hasActiveGUIs()) return;
         long window = UIManager.get().getWindow();
         for (int i = 0; i < 9; i++) {

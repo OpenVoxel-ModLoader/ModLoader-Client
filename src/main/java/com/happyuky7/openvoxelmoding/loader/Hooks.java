@@ -242,11 +242,12 @@ public final class Hooks {
     /** Right clicks on tiles (crafting table, chest, bed) and tile placement go through {@link Tiles}. */
     public static void fireEvent(Object manager, net.openvoxel.engine.events.GameEvent event) {
         VoxelEngine e = VoxelEngine.getEngine();
-        boolean tilePlacement = false;
+        boolean tilePlacement = false, pick = false;
         try {
             if (event instanceof net.openvoxel.engine.events.player.ClickEvent && e != null) {
                 net.openvoxel.engine.events.player.ClickEvent click = (net.openvoxel.engine.events.player.ClickEvent) event;
                 if (click.type == net.openvoxel.engine.events.player.ClickEvent.ClickType.LEFT && Mobs.suppressBlockClick()) return;
+                pick = click.type == net.openvoxel.engine.events.player.ClickEvent.ClickType.MIDDLE;
                 if (click.type == net.openvoxel.engine.events.player.ClickEvent.ClickType.RIGHT) {
                     if (Tiles.onRightClick(e, click)) return;
                     tilePlacement = Tiles.pendingPlace != null;
@@ -255,7 +256,12 @@ public final class Hooks {
         } catch (Throwable error) { System.err.println("[ModLoader] tile click: " + error); }
         try { orig("net.openvoxel.engine.events.GameEventManager", "fire", false, void.class, net.openvoxel.engine.events.GameEvent.class).invoke(manager, event); }
         catch (Throwable t) { throw rethrow(t); }
-        finally { if (tilePlacement && e != null) Tiles.finishPlace(e); }
+        finally {
+            if (tilePlacement && e != null) Tiles.finishPlace(e);
+            // Every listener (mods, sounds) saw the middle click; the engine's own pick only set the
+            // hand block, which PickBlock now replaces with the Minecraft behaviour.
+            if (pick && e != null) try { PickBlock.pick(e); BuiltinUI.select(e, BuiltinUI.selected); } catch (Throwable error) { System.err.println("[ModLoader] pick block: " + error); }
+        }
     }
 
     /** Survival: breaks only after the mining timer (see {@link Mining}), drops go to the inventory, placing consumes stacks. */
@@ -329,6 +335,22 @@ public final class Hooks {
             InetAddress address = InetAddress.getByName(h);
             return address.isLoopbackAddress() || address.isSiteLocalAddress() || address.isLinkLocalAddress() || address.isAnyLocalAddress();
         } catch (Exception ignored) { return false; }
+    }
+
+    /** Remembers the singleplayer world folder so ModLoader blocks are saved inside that world. */
+    public static void startSingleplayer(net.openvoxel.client.WorldSaves.Entry entry) {
+        Tiles.worldDir = entry != null ? entry.dir : null;
+        try { orig("net.openvoxel.client.ClientMain", "startSingleplayer", true, void.class, net.openvoxel.client.WorldSaves.Entry.class).invoke(entry); }
+        catch (Throwable t) { throw rethrow(t); }
+    }
+
+    /** Every connection (singleplayer's integrated server too) goes through join(host, port, serverId). */
+    public static void join(String host, int port, String serverId) {
+        if (!"singleplayer".equals(serverId)) Tiles.worldDir = null;
+        Tiles.serverId = host + "_" + port;
+        if (!"singleplayer".equals(serverId)) Tiles.serverId = serverId != null && !serverId.isEmpty() ? serverId : host + "_" + port;
+        try { orig("net.openvoxel.client.ClientMain", "join", true, void.class, String.class, int.class, String.class).invoke(host, port, serverId); }
+        catch (Throwable t) { throw rethrow(t); }
     }
 
     public static void appearanceApply(String base, byte[] skin, String modelJson, String uuid) {

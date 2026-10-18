@@ -23,13 +23,19 @@ final class Items {
     static final class Item {
         final String id, tier; final Kind kind; final int value; final int[] palette; final String[] rows;
         private Texture texture; private byte[] png;
+        /** Display name for mod items (used when no translation key exists). */
+        String label;
         Item(String id, Kind kind, String tier, int value, int[] palette, String[] rows) { this.id = id; this.kind = kind; this.tier = tier; this.value = value; this.palette = palette; this.rows = rows; }
         boolean isArmor() { return kind == Kind.HELMET || kind == Kind.CHESTPLATE || kind == Kind.LEGGINGS || kind == Kind.BOOTS; }
         boolean isTool() { return kind == Kind.PICKAXE || kind == Kind.SHOVEL || kind == Kind.AXE; }
         int defaultCount() { return kind == Kind.FOOD ? 16 : kind == Kind.MATERIAL ? 64 : 1; }
         boolean isTile() { return kind == Kind.TILE; }
         int armorSlot() { switch (kind) { case HELMET: return 0; case CHESTPLATE: return 1; case LEGGINGS: return 2; case BOOTS: return 3; default: return -1; } }
-        String name() { return Lang.t("item." + id); }
+        String name() {
+            String key = "item." + id.replace(':', '.');
+            String t = Lang.t(key);
+            return t.equals(key) && label != null ? label : t;
+        }
         String tooltip() {
             switch (kind) {
                 case SWORD: return Lang.t("tip.damage", value);
@@ -41,7 +47,7 @@ final class Items {
             }
         }
         byte[] png() {
-            if (png == null) try { png = encode(sprite(rows, palette)); } catch (Exception e) { png = new byte[0]; }
+            if (png == null) try { png = rows == null ? new byte[0] : encode(sprite(rows, palette)); } catch (Exception e) { png = new byte[0]; }
             return png;
         }
         Texture texture() {
@@ -217,7 +223,23 @@ final class Items {
         add(new Item("rotten_flesh", Kind.FOOD, "food", 2, pal(0xFF7A5A3A, 0xFF4A3220, 0xFF9A8A5A), BEEF));
     }
 
-    static Item byId(String id) { return BY_ID.get(id); }
+    static Item byId(String id) {
+        if (id == null) return null;
+        Item i = BY_ID.get(id);
+        if (i == null && id.startsWith("minecraft:")) i = BY_ID.get(id.substring(10));
+        if (i == null && id.startsWith("modloader:")) i = BY_ID.get(id.substring(10));
+        return i;
+    }
+
+    /** Item for a mod block ({@code namespace:path}); its icon is the block's side texture. */
+    static Item registerBlockItem(String id, String label, byte[] iconPng) {
+        Item existing = BY_ID.get(id);
+        if (existing != null) return existing;
+        Item item = new Item(id, Kind.TILE, "mod", 0, null, null);
+        item.label = label;
+        item.png = iconPng != null ? iconPng : new byte[0];
+        return add(item);
+    }
 
     static List<Item> ofKind(Kind... kinds) {
         List<Item> out = new ArrayList<>();

@@ -11,10 +11,13 @@ import net.openvoxel.engine.ui.GLUIRenderer;
 import net.openvoxel.engine.ui.UIManager;
 import net.openvoxel.engine.util.Json;
 import net.openvoxel.engine.world.AbstractBlock;
+import net.openvoxel.engine.world.World;
+import net.openvoxel.engine.world.block.BlockState;
 import net.openvoxel.engine.world.block.BlockType;
 import org.joml.Vector3d;
 import org.lwjgl.opengl.GL11;
 
+import java.io.File;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -22,29 +25,40 @@ import java.nio.file.Path;
 import java.util.*;
 
 /**
- * Client-side "tile" blocks the engine does not know about: crafting table, chest and bed.
- * Each one sits on a real engine block (so collision works) and is drawn over it; the tile
- * registry is saved per world seed in {@code client/instance/config/tiles/<seed>.json}.
+ * Placed ModLoader blocks ({@link BlockRegistry}). Each one is a real engine block in the world
+ * (its {@code base}: collision, mining, light) plus an entry here with the namespaced id that
+ * makes it render and behave as the modded block.
+ *
+ * <p>Entries are saved per world, not per seed: singleplayer worlds keep them inside the world
+ * folder ({@code <world>/modloader/blocks.json}, so they travel with the save), servers in
+ * {@code instance/config/servers/<host>_<port>/blocks.json}. Entries whose base block is gone
+ * (world reset, server rejected the placement, edited elsewhere) are dropped automatically.
  */
 final class Tiles {
     private Tiles() {}
 
-    enum Type {
-        OAK_PLANKS("oak_planks", BlockType.OAK_LOG, 1f), CRAFTING_TABLE("crafting_table", BlockType.OAK_LOG, 1f), CHEST("chest", BlockType.OAK_LOG, 0.875f), BED("bed", BlockType.SLAB, 0.5f);
-        final String item; final BlockType base; final float height;
-        Type(String item, BlockType base, float height) { this.item = item; this.base = base; this.height = height; }
-        static Type of(Items.Item item) { if (item == null) return null; for (Type t : values()) if (t.item.equals(item.id)) return t; return null; }
-    }
-
     static final class Tile {
-        final Type type; final int x, y, z; int facing;
+        final BlockRegistry.BlockDef def; final int x, y, z; int facing;
         final Items.Stack[] chest;
-        Tile(Type type, int x, int y, int z, int facing) { this.type = type; this.x = x; this.y = y; this.z = z; this.facing = facing; chest = type == Type.CHEST ? new Items.Stack[27] : null; }
+        final Map<String, String> data = new LinkedHashMap<>();
+        final long placedNs;
+        Tile(BlockRegistry.BlockDef def, int x, int y, int z, int facing, long placedNs) {
+            this.def = def; this.x = x; this.y = y; this.z = z; this.facing = facing; this.placedNs = placedNs;
+            chest = def.kind == BlockRegistry.Kind.CHEST ? new Items.Stack[27] : null;
+        }
     }
 
     private static final Map<Long, Tile> TILES = new HashMap<>();
-    private static long seed; private static boolean loaded;
-    static Type pendingPlace; private static Items.Stack pendingHeld;
+    /** Entries whose id is not registered (mod not installed): kept as-is so they come back with the mod. */
+    private static final List<Map<String, Object>> UNKNOWN = new ArrayList<>();
+    private static boolean loaded, dirty;
+    /** Set by the join hooks: the singleplayer world folder, or null for servers. */
+    static volatile File worldDir;
+    /** Set by the join hooks: {@code host:port} of the server. */
+    static volatile String serverId = "";
+    private static Path file;
+    private static long lastValidateNs, lastSaveNs;
+    static BlockRegistry.BlockDef pendingPlace; private static Items.Stack pendingHeld;
     static float sleepFade; private static long sleepNs;
     private static Field timeField;
     private static final Map<String, Texture> TEX = new HashMap<>();
@@ -55,25 +69,30 @@ final class Tiles {
 
     // ---- Placement & interaction -----------------------------------------------------
 
-    /** Right click: open the tile under the crosshair, or start placing a tile item. Returns true when consumed. */
+    /** Right click: open/use the block under the crosshair, or start placing a block item. Returns true when consumed. */
     static boolean onRightClick(VoxelEngine e, ClickEvent click) {
         if (!e.isWorldActive() || e.getCamera() == null) return false;
-        Tile tile = at(click.worldX, click.worldY, click.worldZ);
+        InputHandler.Hit hit = hit(e);
+        Tile tile = hit != null ? at(hit.x, hit.y, hit.z) : at(click.worldX, click.worldY, click.worldZ);
         if (tile != null && !GameMode.sneaking(e)) {
-            switch (tile.type) {
-                case CRAFTING_TABLE: UIManager.get().openGUI(new Containers.CraftingScreen(e, 3)); break;
-                case CHEST: UIManager.get().openGUI(new Containers.ChestScreen(e, tile)); break;
-                case BED: sleep(e, tile); break;
+            switch (tile.def.kind) {
+                case CRAFTING_TABLE: UIManager.get().openGUI(new Containers.CraftingScreen(e, 3)); return true;
+                case CHEST: UIManager.get().openGUI(new Containers.ChestScreen(e, tile)); return true;
+                case BED: sleep(e, tile); return true;
+                default:
+                    if (tile.def.onUse != null) {
+                        try { if (tile.def.onUse.use(tile.x, tile.y, tile.z)) return true; }
+                        catch (Throwable error) { System.err.println("[ModLoader] " + tile.def.id + " onUse: " + error); }
+                    }
             }
-            return true;
         }
         Items.Stack held = BuiltinUI.held();
-        Type type = held != null && held.item != null ? Type.of(held.item) : null;
-        if (type == null) return false;
+        BlockRegistry.BlockDef def = held != null && held.item != null ? BlockRegistry.ofItem(held.item) : null;
+        if (def == null) return false;
         // Let the engine place the base block; applyEdit tells us where it landed.
-        pendingPlace = type;
+        pendingPlace = def;
         pendingHeld = held;
-        e.getCamera().setBlockInHand(new AbstractBlock(type.base));
+        e.getCamera().setBlockInHand(new AbstractBlock(def.base));
         return false;
     }
 
@@ -89,19 +108,19 @@ final class Tiles {
     static void register(VoxelEngine e, int x, int y, int z) {
         if (pendingPlace == null) return;
         int facing = e.getCamera() != null ? Math.floorMod(Math.round(e.getCamera().getYaw() / 90f), 4) : 0;
-        TILES.put(key(x, y, z), new Tile(pendingPlace, x, y, z, facing));
+        TILES.put(key(x, y, z), new Tile(pendingPlace, x, y, z, facing, System.nanoTime()));
         if (!Settings.isCreative() && pendingHeld != null && --pendingHeld.count <= 0) BuiltinUI.HOTBAR[BuiltinUI.selected] = null;
         BuiltinUI.sound().play("place");
         save();
     }
 
-    /** Called when any block is broken; returns the tile item to drop (chest contents are dropped too). */
+    /** Called when any block is broken; returns the block item to drop (chest contents are dropped too). */
     static Items.Stack onBlockBroken(int x, int y, int z) {
         Tile tile = TILES.remove(key(x, y, z));
         if (tile == null) return null;
         if (tile.chest != null) for (Items.Stack s : tile.chest) if (s != null) Drops.spawn(s, x, y, z);
         save();
-        return Items.Stack.of(Items.byId(tile.type.item));
+        return tile.def.item != null ? Items.Stack.of(tile.def.item) : null;
     }
 
     private static void sleep(VoxelEngine e, Tile bed) {
@@ -121,60 +140,144 @@ final class Tiles {
         } catch (Exception error) { ChatHud.addLine("&c" + error.getMessage()); }
     }
 
-    static void tick(float dt) { if (sleepFade > 0) { float age = (System.nanoTime() - sleepNs) / 1e9f; sleepFade = age < 1.2f ? Math.min(1f, age / 0.4f) : Math.max(0f, 1f - (age - 1.2f) / 0.8f); if (age > 2f) sleepFade = 0; } }
+    static void tick(VoxelEngine e, float dt) {
+        if (sleepFade > 0) { float age = (System.nanoTime() - sleepNs) / 1e9f; sleepFade = age < 1.2f ? Math.min(1f, age / 0.4f) : Math.max(0f, 1f - (age - 1.2f) / 0.8f); if (age > 2f) sleepFade = 0; }
+        long now = System.nanoTime();
+        if (loaded && e.isWorldActive() && now - lastValidateNs > 1_000_000_000L) { lastValidateNs = now; validate(e); }
+        if (dirty && now - lastSaveNs > 2_000_000_000L) save();
+    }
 
     static void renderHud(int w, int h) { if (sleepFade > 0) GLUIRenderer.drawPanel(0, 0, w, h, 0, 0, 0, sleepFade); }
 
+    /**
+     * Drops entries whose base block is no longer there. Only checks chunks that have data
+     * (a neighbour is not air) and skips blocks placed in the last few seconds, so a placement
+     * still travelling to the server is not lost.
+     */
+    private static void validate(VoxelEngine e) {
+        World w = e.getWorld();
+        if (w == null || TILES.isEmpty()) return;
+        long now = System.nanoTime();
+        List<Long> ghosts = new ArrayList<>();
+        for (Map.Entry<Long, Tile> en : TILES.entrySet()) {
+            Tile t = en.getValue();
+            if (now - t.placedNs < 5_000_000_000L) continue;
+            try {
+                if (w.getChunkIfLoaded(Math.floorDiv(t.x, 16), Math.floorDiv(t.z, 16)) == null) continue;
+                int type = BlockState.typeId(w.getState(t.x, t.y, t.z));
+                if (type == t.def.base.getId()) continue;
+                if (!hasData(w, t.x, t.y, t.z)) continue;
+                ghosts.add(en.getKey());
+            } catch (Exception ignored) { }
+        }
+        if (ghosts.isEmpty()) return;
+        for (Long k : ghosts) { Tile t = TILES.remove(k); System.out.println("[ModLoader] blocks: dropped " + t.def.id + " at " + t.x + "," + t.y + "," + t.z + " (base block is gone)"); }
+        save();
+    }
+
+    private static boolean hasData(World w, int x, int y, int z) {
+        int[][] n = {{0, -1, 0}, {1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1}, {0, -2, 0}, {0, -3, 0}};
+        for (int[] d : n) if (BlockState.typeId(w.getState(x + d[0], y + d[1], z + d[2])) != BlockType.AIR.getId()) return true;
+        return false;
+    }
+
     // ---- Persistence ---------------------------------------------------------------
 
-    private static Path file() { return Agent.instanceDir().resolve("config").resolve("tiles").resolve(seed + ".json"); }
+    private static Path resolveFile() {
+        File dir = worldDir;
+        if (dir != null) return dir.toPath().resolve("modloader").resolve("blocks.json");
+        String id = serverId == null || serverId.isEmpty() ? "unknown" : serverId;
+        return Agent.instanceDir().resolve("config").resolve("servers").resolve(id.replaceAll("[^A-Za-z0-9._-]", "_")).resolve("blocks.json");
+    }
+
+    private static Path legacyFile(VoxelEngine e) {
+        long seed = e.getWorld() != null ? e.getWorld().getSeed() : 0;
+        return Agent.instanceDir().resolve("config").resolve("tiles").resolve(seed + ".json");
+    }
 
     static void load(VoxelEngine e) {
         TILES.clear();
-        loaded = true;
-        seed = e.getWorld() != null ? e.getWorld().getSeed() : 0;
+        UNKNOWN.clear();
+        loaded = true; dirty = false;
+        file = resolveFile();
+        Path source = file;
+        boolean migrated = false;
+        if (!Files.isRegularFile(source)) {
+            Path legacy = legacyFile(e);
+            if (Files.isRegularFile(legacy)) { source = legacy; migrated = true; }
+            else { System.out.println("[ModLoader] blocks: new file " + file); return; }
+        }
         try {
-            if (!Files.isRegularFile(file())) return;
-            List<Object> arr = Json.arr(Json.parse(Files.readString(file(), StandardCharsets.UTF_8)));
+            Object root = Json.parse(Files.readString(source, StandardCharsets.UTF_8));
+            List<Object> arr = Json.arr(root);
+            Map<String, Object> obj = Json.obj(root);
+            if (arr == null && obj != null) arr = Json.arr(obj.get("blocks"));
             if (arr == null) return;
+            long placed = System.nanoTime() - 60_000_000_000L;   // loaded entries are validated right away
+            int unknown = 0;
             for (Object o : arr) {
                 Map<String, Object> m = Json.obj(o);
                 if (m == null) continue;
-                Type type = Type.valueOf(Json.str(m.get("type")));
-                Tile t = new Tile(type, (int) Json.num(m.get("x"), 0), (int) Json.num(m.get("y"), 0), (int) Json.num(m.get("z"), 0), (int) Json.num(m.get("facing"), 0));
+                String id = Json.str(m.get("id"));
+                BlockRegistry.BlockDef def = id != null ? BlockRegistry.get(id) : BlockRegistry.legacy(Json.str(m.get("type")));
+                if (def == null) { unknown++; if (id != null) UNKNOWN.add(m); continue; }
+                Tile t = new Tile(def, (int) Json.num(m.get("x"), 0), (int) Json.num(m.get("y"), 0), (int) Json.num(m.get("z"), 0), (int) Json.num(m.get("facing"), 0), placed);
                 List<Object> items = Json.arr(m.get("items"));
                 if (t.chest != null && items != null) for (int i = 0; i < Math.min(27, items.size()); i++) t.chest[i] = parseStack(Json.str(items.get(i)));
+                Map<String, Object> data = Json.obj(m.get("data"));
+                if (data != null) for (Map.Entry<String, Object> d : data.entrySet()) if (d.getValue() != null) t.data.put(d.getKey(), String.valueOf(d.getValue()));
                 TILES.put(key(t.x, t.y, t.z), t);
             }
-            System.out.println("[ModLoader] loaded " + TILES.size() + " tile(s) for seed " + seed);
-        } catch (Exception error) { System.err.println("[ModLoader] tiles load: " + error); }
+            System.out.println("[ModLoader] blocks: loaded " + TILES.size() + " from " + source + (unknown > 0 ? " (" + unknown + " with unknown ids kept for later: mod missing?)" : ""));
+            if (migrated) { System.out.println("[ModLoader] blocks: migrated legacy seed file to " + file); save(); }
+        } catch (Exception error) { System.err.println("[ModLoader] blocks load: " + error); }
     }
 
-    static void unload() { if (loaded) save(); TILES.clear(); loaded = false; }
+    static void unload() { if (loaded) save(); TILES.clear(); UNKNOWN.clear(); loaded = false; file = null; }
 
     static void save() {
-        if (!loaded) return;
-        StringBuilder sb = new StringBuilder("[");
+        if (!loaded || file == null) return;
+        dirty = false; lastSaveNs = System.nanoTime();
+        StringBuilder sb = new StringBuilder("{\"format\":2,\"blocks\":[");
         boolean first = true;
         for (Tile t : TILES.values()) {
             if (!first) sb.append(','); first = false;
-            sb.append("{\"type\":\"").append(t.type.name()).append("\",\"x\":").append(t.x).append(",\"y\":").append(t.y).append(",\"z\":").append(t.z).append(",\"facing\":").append(t.facing);
-            if (t.chest != null) { sb.append(",\"items\":["); for (int i = 0; i < 27; i++) { if (i > 0) sb.append(','); sb.append('"').append(encodeStack(t.chest[i])).append('"'); } sb.append(']'); }
+            sb.append("{\"id\":").append(q(t.def.id)).append(",\"x\":").append(t.x).append(",\"y\":").append(t.y).append(",\"z\":").append(t.z).append(",\"facing\":").append(t.facing);
+            if (t.chest != null) { sb.append(",\"items\":["); for (int i = 0; i < 27; i++) { if (i > 0) sb.append(','); sb.append(q(encodeStack(t.chest[i]))); } sb.append(']'); }
+            if (!t.data.isEmpty()) { sb.append(",\"data\":{"); boolean f = true; for (Map.Entry<String, String> d : t.data.entrySet()) { if (!f) sb.append(','); f = false; sb.append(q(d.getKey())).append(':').append(q(d.getValue())); } sb.append('}'); }
             sb.append('}');
         }
-        sb.append(']');
-        try { Files.createDirectories(file().getParent()); Files.writeString(file(), sb.toString(), StandardCharsets.UTF_8); }
-        catch (Exception error) { System.err.println("[ModLoader] tiles save: " + error); }
+        for (Map<String, Object> raw : UNKNOWN) { if (!first) sb.append(','); first = false; json(sb, raw); }
+        sb.append("]}");
+        try { Files.createDirectories(file.getParent()); Files.writeString(file, sb.toString(), StandardCharsets.UTF_8); }
+        catch (Exception error) { System.err.println("[ModLoader] blocks save: " + error); }
     }
 
+    static void markDirty() { dirty = true; }
+
+    @SuppressWarnings("unchecked")
+    private static void json(StringBuilder sb, Object v) {
+        if (v == null) sb.append("null");
+        else if (v instanceof String) sb.append(q((String) v));
+        else if (v instanceof Number) { double d = ((Number) v).doubleValue(); if (d == Math.rint(d) && Math.abs(d) < 1e15) sb.append((long) d); else sb.append(d); }
+        else if (v instanceof Boolean) sb.append(v);
+        else if (v instanceof Map) { sb.append('{'); boolean f = true; for (Map.Entry<String, Object> en : ((Map<String, Object>) v).entrySet()) { if (!f) sb.append(','); f = false; sb.append(q(en.getKey())).append(':'); json(sb, en.getValue()); } sb.append('}'); }
+        else if (v instanceof List) { sb.append('['); boolean f = true; for (Object o : (List<Object>) v) { if (!f) sb.append(','); f = false; json(sb, o); } sb.append(']'); }
+        else sb.append(q(String.valueOf(v)));
+    }
+
+    private static String q(String s) { return "\"" + (s == null ? "" : s.replace("\\", "\\\\").replace("\"", "\\\"")) + "\""; }
+
+    /** {@code item:<id>:<count>} / {@code block:<NAME>:<count>}; ids may contain ':' (namespaces). */
     static String encodeStack(Items.Stack s) { return s == null ? "" : (s.isBlock() ? "block:" + s.block.name() : "item:" + s.item.id) + ":" + s.count; }
 
     static Items.Stack parseStack(String s) {
         if (s == null || s.isEmpty()) return null;
         try {
-            String[] p = s.split(":");
-            int count = Integer.parseInt(p[2]);
-            return p[0].equals("block") ? Items.Stack.of(BlockType.valueOf(p[1]), count) : Items.Stack.of(Items.byId(p[1]), count);
+            int first = s.indexOf(':'), last = s.lastIndexOf(':');
+            String kind = s.substring(0, first), id = s.substring(first + 1, last);
+            int count = Integer.parseInt(s.substring(last + 1));
+            return kind.equals("block") ? Items.Stack.of(BlockType.valueOf(id), count) : Items.Stack.of(Items.byId(id), count);
         } catch (Exception e) { return null; }
     }
 
@@ -227,7 +330,7 @@ final class Tiles {
             float bright = HandRenderer.brightnessAt(e, renderer, t.x + 0.5, t.y + 0.5, t.z + 0.5);
             GL11.glPushMatrix();
             GL11.glTranslatef((float) rx, (float) ry, (float) rz);
-            switch (t.type) {
+            switch (t.def.kind) {
                 case OAK_PLANKS: box(tex("oak_planks", PLANKS_BLOCK, wood()), tex("oak_planks", PLANKS_BLOCK, wood()), tex("oak_planks", PLANKS_BLOCK, wood()), -0.005f, 1.01f, 1.01f, bright); break;
                 case CRAFTING_TABLE: box(tex("table_top", TABLE_TOP, wood()), tex("table_side", TABLE_SIDE, wood()), tex("table_side", TABLE_SIDE, wood()), -0.005f, 1.01f, 1.01f, bright); break;
                 case CHEST: {
@@ -240,6 +343,11 @@ final class Tiles {
                     GL11.glTranslatef(0.5f, 0, 0.5f); GL11.glRotatef(t.facing * 90f, 0, 1, 0); GL11.glTranslatef(-0.5f, 0, -0.5f);
                     Texture top = tex("bed_top", BED_TOP, bed()), side = tex("bed_side", BED_SIDE, bed());
                     bedBox(top, side, bright);
+                    break;
+                }
+                case CUBE: {
+                    Texture top = t.def.top(), side = t.def.side();
+                    if (top != null) box(top, side != null ? side : top, side != null ? side : top, -0.005f, 1.01f, 1.01f, bright);
                     break;
                 }
             }

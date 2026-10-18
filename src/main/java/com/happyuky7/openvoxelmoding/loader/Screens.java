@@ -39,23 +39,41 @@ final class Screens {
 
     // ---- Main menu (replaces MainMenuScreen.build) --------------------------------------
 
+    /**
+     * Main menu in OpenVoxel's own look (animated backdrop, logo, themed buttons) — this is not
+     * Minecraft — with the ModLoader entries added under the game's buttons.
+     */
     static void buildMainMenu(Screen screen, float w, float h) throws Exception {
         List<Widget> list = Mc.widgetsOf(screen);
         list.clear();
         int iw = (int) w, ih = (int) h;
-        float bw = 300, bh = 40, gap = 8, cx = w / 2f, y = h * 0.42f;
-        list.add(new MenuBackdrop(w, h));
-        list.add(new McButton(cx - bw / 2, y, bw, bh, t("menu.singleplayer"), b -> { UIManager.get().closeAllGUIs(); UIManager.get().openGUI(new SingleplayerScreen(iw, ih)); }));
-        list.add(new McButton(cx - bw / 2, y + (bh + gap), bw, bh, t("menu.multiplayer"), b -> { UIManager.get().closeAllGUIs(); UIManager.get().openGUI(new ServerSelectScreen(iw, ih)); }));
-        list.add(new McButton(cx - bw / 2, y + 2 * (bh + gap), bw, bh, t("menu.mods", Agent.getLoadedModNames().size()), b -> UIManager.get().openGUI(new ModsScreen(null, iw, ih))));
-        float y3 = y + 3 * (bh + gap) + 10, half = (bw - gap) / 2;
-        list.add(new McButton(cx - bw / 2, y3, half, bh, t("menu.options"), b -> UIManager.get().openGUI(new SettingsScreen(null, iw, ih))));
-        list.add(new McButton(cx + gap / 2, y3, half, bh, t("menu.skin"), b -> UIManager.get().openGUI(new SkinScreen(null, iw, ih))));
-        list.add(new McButton(cx - bw / 2, y3 + bh + gap, half, bh, t("menu.account"), b -> UIManager.get().openGUI(new AccountScreen(null, iw, ih))));
-        list.add(new McButton(cx + gap / 2, y3 + bh + gap, half, bh, t("menu.quit"), b -> VoxelEngine.getEngine().stop()));
-        list.add(new McLabel(8, h - 10, "OpenVoxel " + VoxelEngine.getEngine().getVersion() + " / " + Agent.NAME + " " + Agent.VERSION).color(Mc.TEXT));
+        float bw = 300, bh = 46, gap = 12, half = (bw - gap) / 2, cx = w / 2f, y = h * 0.40f;
+        list.add(new net.openvoxel.engine.ui.widgets.MenuBackdrop(0, 0, w, h));
+        Widget logo = gameLogo(w, h * 0.13f);
+        if (logo != null) list.add(logo);
+        list.add(new Button(cx - bw / 2, y, bw, bh, t("menu.singleplayer"), b -> { UIManager.get().closeAllGUIs(); UIManager.get().openGUI(new SingleplayerScreen(iw, ih)); }));
+        list.add(new Button(cx - bw / 2, y + (bh + gap), bw, bh, t("menu.multiplayer"), b -> { UIManager.get().closeAllGUIs(); UIManager.get().openGUI(new ServerSelectScreen(iw, ih)); }));
+        float y2 = y + 2 * (bh + gap);
+        list.add(new Button(cx - bw / 2, y2, half, bh, t("menu.mods", Agent.getLoadedModNames().size()), b -> UIManager.get().openGUI(new ModsScreen(null, iw, ih))));
+        list.add(new Button(cx + gap / 2, y2, half, bh, t("menu.options"), b -> UIManager.get().openGUI(new SettingsScreen(null, iw, ih))));
+        float y3 = y2 + bh + gap;
+        list.add(new Button(cx - bw / 2, y3, half, bh, t("menu.skin"), b -> UIManager.get().openGUI(new SkinScreen(null, iw, ih))));
+        list.add(new Button(cx + gap / 2, y3, half, bh, t("menu.account"), b -> UIManager.get().openGUI(new AccountScreen(null, iw, ih))));
+        list.add(new Button(cx - bw / 2, y3 + bh + gap, bw, bh, t("menu.quit"), b -> VoxelEngine.getEngine().stop()));
+        float[] dim = net.openvoxel.engine.ui.Theme.TEXT_DIM;
+        list.add(new Label(14, h - 24, "OpenVoxel " + VoxelEngine.getEngine().getVersion() + "  ·  " + Agent.NAME + " " + Agent.VERSION).color(dim[0], dim[1], dim[2], dim[3]));
         String site = "open-voxel.net";
-        list.add(new McLabel(w - GLUIRenderer.getTextWidth(site) - 8, h - 10, site).color(Mc.TEXT));
+        list.add(new Label(w - GLUIRenderer.getTextWidth(site) - 14, h - 24, site).color(dim[0], dim[1], dim[2], dim[3]));
+    }
+
+    /** The game's own logo widget (private inner class of MainMenuScreen). */
+    private static Widget gameLogo(float w, float y) {
+        try {
+            Class<?> c = Class.forName("net.openvoxel.client.MainMenuScreen$LogoTitle");
+            java.lang.reflect.Constructor<?> k = c.getDeclaredConstructor(float.class, float.class);
+            k.setAccessible(true);
+            return (Widget) k.newInstance(w, y);
+        } catch (Throwable error) { System.err.println("[ModLoader] main menu logo: " + error); return null; }
     }
 
     static final class MenuBackdrop extends Widget {

@@ -45,6 +45,8 @@ final class Transformer implements ClassFileTransformer {
         wrap("net/openvoxel/client/net/AppearanceLoader", "apply", "(Ljava/lang/String;[BLjava/lang/String;Ljava/lang/String;)V", "appearanceApply");
         wrap("net/openvoxel/client/MainMenuScreen", "build", "(FF)V", "mainMenuBuild");
         wrap("net/openvoxel/engine/ui/PauseMenu", "build", "(FF)V", "pauseMenuBuild");
+        wrap("net/openvoxel/client/ClientMain", "startSingleplayer", "(Lnet/openvoxel/client/WorldSaves$Entry;)V", "startSingleplayer");
+        wrap("net/openvoxel/client/ClientMain", "join", "(Ljava/lang/String;ILjava/lang/String;)V", "join");
         wrap("net/openvoxel/engine/ui/ChatHud", "addLine", "(Ljava/lang/String;)V", "chatLine");
         wrap("net/openvoxel/engine/world/block/BlockType", "getModel", "(J)Lnet/openvoxel/engine/world/block/model/BlockModel;", "blockModel");
         wrap("net/openvoxel/engine/world/block/BlockType", "computePlacementState", "(Lnet/openvoxel/engine/world/block/BlockPlacement$PlacementContext;J)J", "placementState");

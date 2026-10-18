@@ -110,6 +110,53 @@ public final class ModContext {
         return true;
     }
 
+    /** Called when a player right-clicks a mod block; return true to consume the click. */
+    public interface BlockUseHandler { boolean use(int x, int y, int z); }
+
+    /**
+     * Registers a textured cube block with a namespaced id ({@code "mymod:ruby_block"}), like Fabric.
+     * Textures are 16x16 PNG paths inside the calling mod's jar ({@code top} is required, {@code side}
+     * and {@code bottom} fall back to it). {@code baseBlock} is the engine block it is stored as in the
+     * world (collision, mining time, light), e.g. {@code "STONE"}. The block gets an item with the same
+     * id, usable in {@link #giveItem}, recipes and the creative inventory; placed blocks are saved with
+     * the world. Call from {@code onLoad} or {@code onGameReady}. Returns false if registration failed.
+     */
+    public boolean registerBlock(String id, String displayName, String baseBlock, String topTexture, String sideTexture, String bottomTexture, BlockUseHandler onUse) {
+        return registerBlockFrom(callerLoader(), id, displayName, baseBlock, topTexture, sideTexture, bottomTexture, onUse);
+    }
+
+    /** Short form: one texture for every face, no right-click behaviour. */
+    public boolean registerBlock(String id, String displayName, String baseBlock, String texture) {
+        return registerBlockFrom(callerLoader(), id, displayName, baseBlock, texture, null, null, null);
+    }
+
+    private boolean registerBlockFrom(ClassLoader loader, String id, String displayName, String baseBlock, String topTexture, String sideTexture, String bottomTexture, BlockUseHandler onUse) {
+        if (!BlockRegistry.validId(id)) { log("registerBlock: invalid id '" + id + "' (use namespace:path, lowercase, e.g. mymod:ruby_block)"); return false; }
+        byte[] top = resource(loader, topTexture);
+        if (top == null) { log("registerBlock " + id + ": texture not found in the mod jar: " + topTexture); return false; }
+        return BlockRegistry.registerCube(id, displayName, baseBlock, top, resource(loader, sideTexture), resource(loader, bottomTexture), onUse) != null;
+    }
+
+    /** Class loader of the mod that called into ModContext (its jar holds the textures). */
+    private static ClassLoader callerLoader() {
+        Class<?> caller = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
+                .walk(frames -> frames.map(StackWalker.StackFrame::getDeclaringClass).filter(c -> c != ModContext.class).findFirst().orElse(ModContext.class));
+        return caller.getClassLoader() != null ? caller.getClassLoader() : ClassLoader.getSystemClassLoader();
+    }
+
+    /** Ids of every ModLoader block ({@code modloader:chest}, mod blocks...). */
+    public java.util.List<String> blockIds() { java.util.List<String> out = new java.util.ArrayList<>(); for (BlockRegistry.BlockDef d : BlockRegistry.all()) out.add(d.id); return out; }
+
+    /** Id of the ModLoader block at a position ({@code "modloader:chest"}) or null if it is a plain engine block. */
+    public String getBlockId(int x, int y, int z) { Tiles.Tile t = Tiles.at(x, y, z); return t == null ? null : t.def.id; }
+
+    private static byte[] resource(ClassLoader loader, String path) {
+        if (path == null || path.isEmpty()) return null;
+        String p = path.startsWith("/") ? path.substring(1) : path;
+        try (java.io.InputStream in = loader.getResourceAsStream(p)) { return in == null ? null : in.readAllBytes(); }
+        catch (java.io.IOException e) { return null; }
+    }
+
     /** All known item ids (not blocks). */
     public java.util.List<String> itemIds() { java.util.List<String> out = new java.util.ArrayList<>(); for (Items.Item i : Items.ALL) out.add(i.id); return out; }
 

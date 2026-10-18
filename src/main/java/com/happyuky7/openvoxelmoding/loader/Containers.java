@@ -217,7 +217,7 @@ final class Containers {
             for (int i = 0; i < 27; i++) slots.add(new Slot(tile.chest, i, gx + (i % 9) * (SLOT + GAP), gy + (i / 9) * (SLOT + GAP), false, true));
             addPlayerInventory(gx, gy + 3 * (SLOT + GAP) + 24);
         }
-        @Override void afterChange() { super.afterChange(); Tiles.save(); }
+        @Override void afterChange() { super.afterChange(); Tiles.markDirty(); }
         @Override public void onClose() { Tiles.save(); super.onClose(); }
     }
 }
