@@ -10,5 +10,5 @@ rm -rf dist/javadoc
 javadoc --release 11 -quiet -Xdoclint:none -encoding UTF-8 -charset UTF-8 -windowtitle "OpenVoxel ModLoader API" \
   -doctitle "OpenVoxel ModLoader client API" -sourcepath src/main/java -classpath "$GAME:lib/asm-9.7.1.jar:lib/asm-tree-9.7.1.jar" \
   -link https://docs.oracle.com/en/java/javase/11/docs/api/ -d dist/javadoc \
-  $P/ClientMod.java $P/ModContext.java $P/ModConfig.java $P/NativeBlocks.java $P/Lang.java
+  $P/ClientMod.java $P/ModContext.java $P/ModConfig.java $P/NativeBlocks.java $P/Lang.java $P/BlockRegistry.java $P/package-info.java
 echo "Javadoc in dist/javadoc"

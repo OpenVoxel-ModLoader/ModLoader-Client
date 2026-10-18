@@ -35,9 +35,9 @@ public final class NativeBlocks {
         byte[] top, side, bottom;
         boolean solid = true, occludes = true, translucent, gravity, hidden;
         int light, opacity = 15;
-        float hardness = 1.5f;
-        int tool;                 // 0 none, 1 pickaxe, 2 shovel, 3 axe
-        boolean requiresTool;
+        public float hardness = 1.5f;
+        public int tool;                 // 0 none, 1 pickaxe, 2 shovel, 3 axe
+        public boolean requiresTool;
         int numericId = -1;
         volatile Object type;     // the BlockType constant once the enum is initialized
 
@@ -101,7 +101,7 @@ public final class NativeBlocks {
     /** PNG bytes of every native texture: the engine reloads block textures from their file path, which these do not have. */
     private static final Map<Texture, byte[]> PNGS = Collections.synchronizedMap(new IdentityHashMap<>());
 
-    static byte[] pngOf(Object texture) { return PNGS.get(texture); }
+    public static byte[] pngOf(Object texture) { return PNGS.get(texture); }
 
     private static Texture texture(byte[] png) { Texture t = new Texture(png); PNGS.put(t, png); return t; }
     private static final Map<Object, Def> BY_TYPE = new IdentityHashMap<>();
@@ -126,13 +126,13 @@ public final class NativeBlocks {
 
     public static Collection<Def> all() { return Collections.unmodifiableCollection(DEFS.values()); }
     public static Def get(String id) { return DEFS.get(id); }
-    static Def of(Object type) { return type == null ? null : BY_TYPE.get(type); }
+    public static Def of(Object type) { return type == null ? null : BY_TYPE.get(type); }
 
     /** The BlockType for a namespaced id, or null. */
     public static BlockType type(String id) { Def d = DEFS.get(id); return d == null ? null : (BlockType) d.type; }
 
     /** Display name for a native block type, or null for vanilla blocks. */
-    static String label(Object type) {
+    public static String label(Object type) {
         Def d = of(type);
         if (d == null) return null;
         String key = "block." + d.id.replace(':', '.');

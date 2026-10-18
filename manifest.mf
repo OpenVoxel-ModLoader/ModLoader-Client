@@ -1,5 +1,5 @@
 Manifest-Version: 1.0
-Premain-Class: com.happyuky7.openvoxelmoding.loader.Agent
+Premain-Class: com.happyuky7.openvoxelmoding.loader.core.Agent
 Can-Redefine-Classes: true
 Can-Retransform-Classes: true
 

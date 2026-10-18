@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "com.happyuky7.openvoxelmoding"
-val loaderVersion = "1.1.0-pre2"
+val loaderVersion = "1.1.0-pre3"
 val gameVersion = "0.0.8"
 version = loaderVersion
 
@@ -37,7 +37,7 @@ tasks.jar {
     destinationDirectory.set(projectDir.resolve("dist"))
     manifest {
         attributes(
-            "Premain-Class" to "com.happyuky7.openvoxelmoding.loader.Agent",
+            "Premain-Class" to "com.happyuky7.openvoxelmoding.loader.core.Agent",
             "Can-Redefine-Classes" to "true",
             "Can-Retransform-Classes" to "true",
             "Implementation-Title" to "OpenVoxel ModLoader (client)",

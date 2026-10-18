@@ -1,5 +1,15 @@
 package com.happyuky7.openvoxelmoding.loader;
 
+import com.happyuky7.openvoxelmoding.loader.command.ClientCommands;
+import com.happyuky7.openvoxelmoding.loader.core.Agent;
+import com.happyuky7.openvoxelmoding.loader.core.Settings;
+import com.happyuky7.openvoxelmoding.loader.crafting.Recipes;
+import com.happyuky7.openvoxelmoding.loader.gameplay.GameMode;
+import com.happyuky7.openvoxelmoding.loader.item.Items;
+import com.happyuky7.openvoxelmoding.loader.item.Mining;
+import com.happyuky7.openvoxelmoding.loader.ui.BuiltinUI;
+import com.happyuky7.openvoxelmoding.loader.world.Tiles;
+
 import net.openvoxel.engine.VoxelEngine;
 import net.openvoxel.engine.ui.ChatHud;
 import net.openvoxel.engine.world.block.BlockType;
@@ -51,8 +61,8 @@ public final class ModContext {
     private final Map<String, ModConfig> configs = new HashMap<>();
     private final List<Runnable> deferred = new ArrayList<>();
 
-    ModContext(Path gameDirectory) { this.gameDirectory = gameDirectory; }
-    void setEngine(Object engine) { this.engine = engine; }
+    public ModContext(Path gameDirectory) { this.gameDirectory = gameDirectory; }
+    public void setEngine(Object engine) { this.engine = engine; }
 
     // ---- Environment ---------------------------------------------------------------------
 
@@ -153,7 +163,7 @@ public final class ModContext {
      * @return the (cached) config; changes are saved with {@link ModConfig#save()} and on shutdown
      */
     public ModConfig config(String modId) { return configs.computeIfAbsent(modId, ModConfig::new); }
-    void saveConfigs() { for (ModConfig c : configs.values()) c.save(); }
+    public void saveConfigs() { for (ModConfig c : configs.values()) c.save(); }
 
     // ---- Player state and items ----------------------------------------------------------
 
@@ -311,7 +321,7 @@ public final class ModContext {
         return true;
     }
 
-    void runDeferred() {
+    public void runDeferred() {
         List<Runnable> copy;
         synchronized (deferred) { copy = new ArrayList<>(deferred); deferred.clear(); }
         for (Runnable r : copy) try { r.run(); } catch (Throwable error) { log("deferred mod call failed: " + error); }

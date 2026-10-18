@@ -10,11 +10,11 @@ Part of [github.com/OpenVoxel-ModLoader](https://github.com/OpenVoxel-ModLoader)
 
 A mod loader for the OpenVoxel client that never modifies the game: it runs as a Java agent
 injected into the official launcher and wraps engine methods in memory (ASM). Release jar:
-`ModLoader-v1.1.0-pre2-vgame-0.0.8-client.jar` (loader 1.1.0-pre2 for game 0.0.8 / `0.0.8-Debug`).
+`ModLoader-v1.1.0-pre3-vgame-0.0.8-client.jar` (loader 1.1.0-pre3 for game 0.0.8 / `0.0.8-Debug`).
 
 ### Install & play
 
-1. Download `ModLoader-v1.1.0-pre2-vgame-0.0.8-client.jar` from Releases into `dist/` (or build it).
+1. Download `ModLoader-v1.1.0-pre3-vgame-0.0.8-client.jar` from Releases into `dist/` (or build it).
 2. Put this folder next to `OpenVoxelLauncher.exe` (or set `OPENVOXEL_HOME` to the launcher folder).
 3. Run `launch.bat` (Windows), `launch.ps1` (PowerShell) or `./launch.sh` (Linux).
 4. **In the launcher select the version `0.0.8-Debug` and press PLAY.**
@@ -36,17 +36,21 @@ Minecraft-style menus and HUD, Creative / Survival (hunger, armor, tools, mining
 crafting 2x2 and crafting table, chests, bed), Steve/Alex two-layer skins + capes/elytra, F3,
 chat colors/history/Tab completion, rebindable controls, resource packs, languages (en/es +
 mod `assets/<id>/lang`), sound packs and music folders, fog/tone shader, client commands
-(`/chelp`). Example mods in [ModLoader-ModsExamples](https://github.com/OpenVoxel-ModLoader/ModLoader-ModsExamples); API in the [docs](https://openvoxel-modloader.github.io/).
+(`/chelp`). Code layout (`src/main/java/com/happyuky7/openvoxelmoding/loader/`): the root package is the **mod API**
+(`ClientMod`, `ModContext`, `ModConfig`, `Lang`, `NativeBlocks`, `BlockRegistry`); internals live in `core`
+(agent, ASM transformer, hooks), `net`, `command`, `ui`, `item`, `crafting`, `world`, `gameplay`, `audio` and `cosmetics`.
+
+Example mods in [ModLoader-ModsExamples](https://github.com/OpenVoxel-ModLoader/ModLoader-ModsExamples); API in the [docs](https://openvoxel-modloader.github.io/).
 
 ## Español
 
 Un cargador de mods para el cliente de OpenVoxel que nunca modifica el juego: se ejecuta como
 agente Java inyectado en el launcher oficial y envuelve métodos del motor en memoria (ASM).
-Jar de release: `ModLoader-v1.1.0-pre2-vgame-0.0.8-client.jar` (loader 1.1.0-pre2 para el juego 0.0.8 / `0.0.8-Debug`).
+Jar de release: `ModLoader-v1.1.0-pre3-vgame-0.0.8-client.jar` (loader 1.1.0-pre3 para el juego 0.0.8 / `0.0.8-Debug`).
 
 ### Instalar y jugar
 
-1. Descarga `ModLoader-v1.1.0-pre2-vgame-0.0.8-client.jar` de Releases a `dist/` (o compílalo).
+1. Descarga `ModLoader-v1.1.0-pre3-vgame-0.0.8-client.jar` de Releases a `dist/` (o compílalo).
 2. Pon esta carpeta junto a `OpenVoxelLauncher.exe` (o define `OPENVOXEL_HOME` con la carpeta del launcher).
 3. Ejecuta `launch.bat` (Windows), `launch.ps1` (PowerShell) o `./launch.sh` (Linux).
 4. **En el launcher selecciona la versión `0.0.8-Debug` y pulsa PLAY.**

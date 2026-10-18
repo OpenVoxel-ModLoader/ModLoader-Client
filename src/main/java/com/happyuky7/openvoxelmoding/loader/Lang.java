@@ -1,5 +1,7 @@
 package com.happyuky7.openvoxelmoding.loader;
 
+import com.happyuky7.openvoxelmoding.loader.core.Agent;
+
 import net.openvoxel.engine.util.Json;
 
 import java.io.InputStream;
@@ -22,7 +24,7 @@ public final class Lang {
     private static final String[] BUNDLED = {"en_us", "es_es"};
     static String code = "en_us";
 
-    static void registerModJar(Path jar) { MOD_JARS.add(jar); }
+    public static void registerModJar(Path jar) { MOD_JARS.add(jar); }
 
     /** @return the active language code, e.g. {@code en_us} */
     public static String current() { return code; }

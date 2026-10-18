@@ -1,5 +1,7 @@
 package com.happyuky7.openvoxelmoding.loader;
 
+import com.happyuky7.openvoxelmoding.loader.core.Agent;
+
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;

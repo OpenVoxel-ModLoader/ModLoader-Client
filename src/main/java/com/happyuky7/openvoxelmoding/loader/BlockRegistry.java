@@ -1,5 +1,7 @@
 package com.happyuky7.openvoxelmoding.loader;
 
+import com.happyuky7.openvoxelmoding.loader.item.Items;
+
 import net.openvoxel.engine.rendering.Texture;
 import net.openvoxel.engine.world.block.BlockType;
 
@@ -16,21 +18,21 @@ public final class BlockRegistry {
     private BlockRegistry() {}
 
     /** Behaviour family of a block. {@code CUBE} is a plain textured block (mods). */
-    enum Kind { OAK_PLANKS, CRAFTING_TABLE, CHEST, BED, CUBE }
+    public enum Kind { OAK_PLANKS, CRAFTING_TABLE, CHEST, BED, CUBE }
 
-    static final class BlockDef {
-        final String id;               // namespace:path
-        final Kind kind;
-        final BlockType base;          // engine block it is stored as
-        final Items.Item item;         // item that places it / drops when broken
+    public static final class BlockDef {
+        public final String id;               // namespace:path
+        public final Kind kind;
+        public final BlockType base;          // engine block it is stored as
+        public final Items.Item item;         // item that places it / drops when broken
         final float height;
-        final ModContext.BlockUseHandler onUse;
+        public final ModContext.BlockUseHandler onUse;
         final byte[] topPng, sidePng, bottomPng;
         /** 24-bit code stored in the block state (bits 32..55), derived from the id: same on every client. */
         final int code;
         private Texture top, side, bottom;
         /** Textures used by the chunk mesher; created on the render thread by {@link Tiles#prepareTextures}. */
-        volatile Texture meshTop, meshSide, meshFront, meshBottom;
+        public volatile Texture meshTop, meshSide, meshFront, meshBottom;
 
         BlockDef(String id, Kind kind, BlockType base, Items.Item item, float height, ModContext.BlockUseHandler onUse, byte[] topPng, byte[] sidePng, byte[] bottomPng) {
             this.id = id; this.kind = kind; this.base = base; this.item = item; this.height = height; this.onUse = onUse;
@@ -39,7 +41,7 @@ public final class BlockRegistry {
         }
 
         /** Texture for a mesher face (0 up, 1 down, 2 -x, 3 +x, 4 -z, 5 +z), front turned towards {@code facing}. */
-        Texture meshFace(int face, int facing) {
+        public Texture meshFace(int face, int facing) {
             if (face == 0) return meshTop;
             if (face == 1) return meshBottom != null ? meshBottom : meshTop;
             int front = FRONT_FACE[facing & 3];
@@ -48,9 +50,9 @@ public final class BlockRegistry {
 
         String namespace() { int c = id.indexOf(':'); return c < 0 ? "minecraft" : id.substring(0, c); }
 
-        Texture top() { return top != null ? top : (top = tex(topPng)); }
-        Texture side() { return side != null ? side : (side = tex(sidePng)); }
-        Texture bottom() { return bottom != null ? bottom : (bottom = tex(bottomPng != null ? bottomPng : topPng)); }
+        public Texture top() { return top != null ? top : (top = tex(topPng)); }
+        public Texture side() { return side != null ? side : (side = tex(sidePng)); }
+        public Texture bottom() { return bottom != null ? bottom : (bottom = tex(bottomPng != null ? bottomPng : topPng)); }
 
         private static Texture tex(byte[] png) {
             if (png == null || png.length == 0) return null;
@@ -62,7 +64,7 @@ public final class BlockRegistry {
     private static final int[] FRONT_FACE = {5, 2, 4, 3};
 
     // State layout: bits 0..26 belong to the engine; ModLoader uses 32..55 for the block code and 56..57 for facing.
-    static final int CODE_SHIFT = 32, FACING_SHIFT = 56;
+    public static final int CODE_SHIFT = 32, FACING_SHIFT = 56;
     static final long CODE_MASK = 0xFFFFFFL;
 
     static int codeOf(String id) {
@@ -73,15 +75,15 @@ public final class BlockRegistry {
     }
 
     /** Base engine state + ModLoader block code + facing. */
-    static long encode(long baseState, BlockDef def, int facing) {
+    public static long encode(long baseState, BlockDef def, int facing) {
         return (baseState & 0xFFFFFFFFL) | ((long) def.code & CODE_MASK) << CODE_SHIFT | ((long) (facing & 3)) << FACING_SHIFT;
     }
 
-    static int codeIn(long state) { return (int) ((state >>> CODE_SHIFT) & CODE_MASK); }
-    static int facingIn(long state) { return (int) ((state >>> FACING_SHIFT) & 3); }
+    public static int codeIn(long state) { return (int) ((state >>> CODE_SHIFT) & CODE_MASK); }
+    public static int facingIn(long state) { return (int) ((state >>> FACING_SHIFT) & 3); }
 
     /** The ModLoader block stored in this state, or null (plain engine block, or a mod that is not installed). */
-    static BlockDef ofState(long state) { int c = codeIn(state); return c == 0 ? null : BY_CODE.get(c); }
+    public static BlockDef ofState(long state) { int c = codeIn(state); return c == 0 ? null : BY_CODE.get(c); }
 
     private static final Map<Integer, BlockDef> BY_CODE = new HashMap<>();
     private static final Map<String, BlockDef> BY_ID = new LinkedHashMap<>();
@@ -107,19 +109,19 @@ public final class BlockRegistry {
         return true;
     }
 
-    static BlockDef get(String id) {
+    public static BlockDef get(String id) {
         if (id == null) return null;
         BlockDef d = BY_ID.get(id);
         if (d == null && id.indexOf(':') < 0) d = BY_ID.get("modloader:" + id);
         return d;
     }
 
-    static BlockDef ofItem(Items.Item item) { return item == null ? null : BY_ITEM.get(item); }
+    public static BlockDef ofItem(Items.Item item) { return item == null ? null : BY_ITEM.get(item); }
 
-    static Collection<BlockDef> all() { return Collections.unmodifiableCollection(BY_ID.values()); }
+    public static Collection<BlockDef> all() { return Collections.unmodifiableCollection(BY_ID.values()); }
 
     /** Pre-1.1 save files used enum names (CHEST, CRAFTING_TABLE, BED). */
-    static BlockDef legacy(String typeName) {
+    public static BlockDef legacy(String typeName) {
         if (typeName == null) return null;
         return get("modloader:" + typeName.toLowerCase(Locale.ROOT));
     }
