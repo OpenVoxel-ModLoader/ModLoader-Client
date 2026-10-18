@@ -63,8 +63,10 @@ final class PickBlock {
     }
 
     private static Items.Stack target(VoxelEngine e, InputHandler.Hit hit) {
-        Tiles.Tile tile = Tiles.at(hit.x, hit.y, hit.z);
-        if (tile != null) return tile.def.item != null ? Items.Stack.of(tile.def.item) : null;
+        BlockRegistry.BlockDef def = Tiles.defAt(hit.x, hit.y, hit.z);
+        Tiles.Tile tile = def == null ? Tiles.at(hit.x, hit.y, hit.z) : null;
+        if (def == null && tile != null) def = tile.def;
+        if (def != null) return def.item != null ? Items.Stack.of(def.item) : null;
         try {
             BlockType type = BlockType.fromId(BlockState.typeId(e.getWorld().getState(hit.x, hit.y, hit.z)));
             if (type == null || type == BlockType.AIR) return null;

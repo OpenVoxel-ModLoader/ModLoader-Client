@@ -178,6 +178,7 @@ public final class Hooks {
 
     public static void statusRender(VoxelEngine e) {
         boolean alive = e.isWorldActive() && e.getLocalPlayer() != null && !e.getLocalPlayer().dead;
+        if (!alive && e.isWorldActive() && e.getLocalPlayer() != null) return;      // DeathScreen replaces "Press R to respawn"
         if (alive && Settings.isCreative()) return;
         if (alive) {
             int[] aspect = e.getCamera() != null ? e.getCamera().getAspect() : new int[]{1280, 720};
@@ -218,6 +219,19 @@ public final class Hooks {
         try { if (type == BlockType.TORCH && Torches.isWall(state)) return Torches.wallModel(base, Torches.facing(state)); }
         catch (Throwable error) { System.err.println("[ModLoader] torch model: " + error); }
         return base;
+    }
+
+    /** Chunk mesher texture lookup: ModLoader blocks (code in the state) get their own textures. */
+    public static net.openvoxel.engine.rendering.Texture blockTexture(Object type, int face, long state) {
+        if ((state >>> BlockRegistry.CODE_SHIFT) != 0) {
+            BlockRegistry.BlockDef def = BlockRegistry.ofState(state);
+            if (def != null && def.meshTop != null) {
+                net.openvoxel.engine.rendering.Texture t = def.meshFace(face, BlockRegistry.facingIn(state));
+                if (t != null) return t;
+            }
+        }
+        try { return (net.openvoxel.engine.rendering.Texture) orig("net.openvoxel.engine.world.block.BlockType", "getTextureForFace", false, net.openvoxel.engine.rendering.Texture.class, int.class, long.class).invoke(type, face, state); }
+        catch (Throwable t) { throw rethrow(t); }
     }
 
     public static long placementState(Object type, net.openvoxel.engine.world.block.BlockPlacement.PlacementContext ctx, long base) {
@@ -268,10 +282,15 @@ public final class Hooks {
     public static void applyEdit(Object engine, int x, int y, int z, net.openvoxel.engine.world.AbstractBlock block) {
         VoxelEngine e = (VoxelEngine) engine;
         BlockType before = null;
+        long beforeState = 0;
         boolean active = e.isWorldActive() && e.getWorld() != null && block != null;
         if (active) {
-            try { before = BlockType.fromId(BlockState.typeId(e.getWorld().getState(x, y, z))); } catch (Exception ignored) { active = false; }
+            try { beforeState = e.getWorld().getState(x, y, z); before = BlockType.fromId(BlockState.typeId(beforeState)); } catch (Exception ignored) { active = false; }
         }
+        // Placing a ModLoader block: the engine placed its base block; add the block code to the state so the
+        // world (and the server, and other players) store which block it is.
+        if (active && Tiles.pendingPlace != null && block.getType() == Tiles.pendingPlace.base && BlockRegistry.codeIn(block.getState()) == 0)
+            block.setState(BlockRegistry.encode(block.getState(), Tiles.pendingPlace, Tiles.placementFacing(e)));
         boolean survival = active && !Settings.isCreative();
         if (survival && block.getType() == BlockType.AIR && !Mining.approved) return; // instant click: wait for the timer
         // Torches need support: a solid block below, or behind a wall torch.
@@ -283,8 +302,8 @@ public final class Hooks {
         if (!active || before == null) return;
         try {
             if (block.getType() == BlockType.AIR) {
-                if (survival && before != BlockType.AIR) Mining.onBroken(before, x, y, z);
-                else if (before != BlockType.AIR) { Items.Stack tile = Tiles.onBlockBroken(x, y, z); if (tile != null) Drops.spawn(tile, x, y, z); }
+                if (survival && before != BlockType.AIR) Mining.onBroken(before, beforeState, x, y, z);
+                else if (before != BlockType.AIR) { Items.Stack tile = Tiles.onBlockBroken(x, y, z, beforeState); if (tile != null) Drops.spawn(tile, x, y, z); }
                 if (before != BlockType.AIR) Torches.onBlockRemoved(e, x, y, z);
             } else if (block.getType() != before) {
                 if (Tiles.pendingPlace != null && block.getType() == Tiles.pendingPlace.base) Tiles.register(e, x, y, z);
@@ -350,6 +369,26 @@ public final class Hooks {
         Tiles.serverId = host + "_" + port;
         if (!"singleplayer".equals(serverId)) Tiles.serverId = serverId != null && !serverId.isEmpty() ? serverId : host + "_" + port;
         try { orig("net.openvoxel.client.ClientMain", "join", true, void.class, String.class, int.class, String.class).invoke(host, port, serverId); }
+        catch (Throwable t) { throw rethrow(t); }
+    }
+
+    private static java.lang.reflect.Field errTitle, errMessage;
+
+    /** Connection/kick errors: explain the common ones (wrong game build, session, refused...) before drawing. */
+    public static void errorScreenBuild(Object screen, float w, float h) {
+        try {
+            if (errTitle == null) {
+                Class<?> c = Class.forName("net.openvoxel.client.ErrorScreen");
+                errTitle = c.getDeclaredField("title"); errTitle.setAccessible(true);
+                errMessage = c.getDeclaredField("message"); errMessage.setAccessible(true);
+            }
+            String title = (String) errTitle.get(screen), message = (String) errMessage.get(screen);
+            if (message != null && !message.contains("\n\n(")) {
+                String[] better = GameBuild.explain(title, message);
+                if (better != null) { errTitle.set(screen, better[0]); errMessage.set(screen, better[1]); }
+            }
+        } catch (Throwable error) { System.err.println("[ModLoader] error screen: " + error); }
+        try { orig("net.openvoxel.client.ErrorScreen", "build", false, void.class, float.class, float.class).invoke(screen, w, h); }
         catch (Throwable t) { throw rethrow(t); }
     }
 

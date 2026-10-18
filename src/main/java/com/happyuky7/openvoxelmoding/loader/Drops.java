@@ -58,6 +58,16 @@ final class Drops {
         DROPS.add(d);
     }
 
+    /** Items scattered on death: they stay longer and are not picked up while you are dead. */
+    static void spawnDeath(Items.Stack stack, int bx, int by, int bz) {
+        Drop d = new Drop(stack, bx + 0.5, by + 0.6, bz + 0.5, RANDOM.nextFloat() * 6.28f);
+        d.vx = (RANDOM.nextDouble() - 0.5) * 4.0;
+        d.vz = (RANDOM.nextDouble() - 0.5) * 4.0;
+        d.vy = 3.5 + RANDOM.nextDouble() * 2.0;
+        d.pickupDelayNs = 2_000_000_000L;
+        DROPS.add(d);
+    }
+
     private static boolean solid(World w, double x, double y, double z) {
         int by = (int) Math.floor(y);
         if (by < 0) return true;

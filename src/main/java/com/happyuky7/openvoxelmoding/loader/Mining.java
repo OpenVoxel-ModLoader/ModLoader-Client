@@ -114,9 +114,9 @@ final class Mining {
     }
 
     /** Called from the applyEdit hook after a survival break went through: spawns a drop entity. */
-    static void onBroken(BlockType broken, int x, int y, int z) {
+    static void onBroken(BlockType broken, long brokenState, int x, int y, int z) {
         BuiltinUI.sound().play("break");
-        Items.Stack tile = Tiles.onBlockBroken(x, y, z);
+        Items.Stack tile = Tiles.onBlockBroken(x, y, z, brokenState);
         if (tile != null) { Drops.spawn(tile, x, y, z); return; }
         if (!dropsWithout(broken, BuiltinUI.held())) return;
         Items.Stack drop = dropOf(broken);

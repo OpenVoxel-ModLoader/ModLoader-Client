@@ -26,11 +26,24 @@ public final class BlockRegistry {
         final float height;
         final ModContext.BlockUseHandler onUse;
         final byte[] topPng, sidePng, bottomPng;
+        /** 24-bit code stored in the block state (bits 32..55), derived from the id: same on every client. */
+        final int code;
         private Texture top, side, bottom;
+        /** Textures used by the chunk mesher; created on the render thread by {@link Tiles#prepareTextures}. */
+        volatile Texture meshTop, meshSide, meshFront, meshBottom;
 
         BlockDef(String id, Kind kind, BlockType base, Items.Item item, float height, ModContext.BlockUseHandler onUse, byte[] topPng, byte[] sidePng, byte[] bottomPng) {
             this.id = id; this.kind = kind; this.base = base; this.item = item; this.height = height; this.onUse = onUse;
             this.topPng = topPng; this.sidePng = sidePng; this.bottomPng = bottomPng;
+            this.code = codeOf(id);
+        }
+
+        /** Texture for a mesher face (0 up, 1 down, 2 -x, 3 +x, 4 -z, 5 +z), front turned towards {@code facing}. */
+        Texture meshFace(int face, int facing) {
+            if (face == 0) return meshTop;
+            if (face == 1) return meshBottom != null ? meshBottom : meshTop;
+            int front = FRONT_FACE[facing & 3];
+            return face == front && meshFront != null ? meshFront : meshSide;
         }
 
         String namespace() { int c = id.indexOf(':'); return c < 0 ? "minecraft" : id.substring(0, c); }
@@ -45,6 +58,32 @@ public final class BlockRegistry {
         }
     }
 
+    /** Mesher face that shows the front for each placement facing (yaw 0 = looking north, front faces the player). */
+    private static final int[] FRONT_FACE = {5, 2, 4, 3};
+
+    // State layout: bits 0..26 belong to the engine; ModLoader uses 32..55 for the block code and 56..57 for facing.
+    static final int CODE_SHIFT = 32, FACING_SHIFT = 56;
+    static final long CODE_MASK = 0xFFFFFFL;
+
+    static int codeOf(String id) {
+        int h = 0x811C9DC5;                                   // FNV-1a, folded to 24 bits
+        for (int i = 0; i < id.length(); i++) { h ^= id.charAt(i); h *= 0x01000193; }
+        int c = (h ^ (h >>> 24)) & 0xFFFFFF;
+        return c == 0 ? 1 : c;
+    }
+
+    /** Base engine state + ModLoader block code + facing. */
+    static long encode(long baseState, BlockDef def, int facing) {
+        return (baseState & 0xFFFFFFFFL) | ((long) def.code & CODE_MASK) << CODE_SHIFT | ((long) (facing & 3)) << FACING_SHIFT;
+    }
+
+    static int codeIn(long state) { return (int) ((state >>> CODE_SHIFT) & CODE_MASK); }
+    static int facingIn(long state) { return (int) ((state >>> FACING_SHIFT) & 3); }
+
+    /** The ModLoader block stored in this state, or null (plain engine block, or a mod that is not installed). */
+    static BlockDef ofState(long state) { int c = codeIn(state); return c == 0 ? null : BY_CODE.get(c); }
+
+    private static final Map<Integer, BlockDef> BY_CODE = new HashMap<>();
     private static final Map<String, BlockDef> BY_ID = new LinkedHashMap<>();
     private static final Map<Items.Item, BlockDef> BY_ITEM = new HashMap<>();
 
@@ -59,9 +98,13 @@ public final class BlockRegistry {
         add(new BlockDef(id, kind, base, Items.byId(item), height, null, null, null, null));
     }
 
-    private static void add(BlockDef def) {
+    private static boolean add(BlockDef def) {
+        BlockDef clash = BY_CODE.get(def.code);
+        if (clash != null) { System.err.println("[ModLoader] block id hash clash: " + def.id + " vs " + clash.id + " (rename one of them)"); return false; }
+        BY_CODE.put(def.code, def);
         BY_ID.put(def.id, def);
         if (def.item != null) BY_ITEM.put(def.item, def);
+        return true;
     }
 
     static BlockDef get(String id) {
@@ -96,7 +139,6 @@ public final class BlockRegistry {
         if (base == BlockType.AIR || !base.isSolid()) { System.err.println("[ModLoader] registerBlock: base block must be solid: " + baseBlock); return null; }
         Items.Item item = Items.registerBlockItem(id, displayName, side != null ? side : top);
         BlockDef def = new BlockDef(id, Kind.CUBE, base, item, 1f, onUse, top, side != null ? side : top, bottom);
-        add(def);
-        return def;
+        return add(def) ? def : null;
     }
 }

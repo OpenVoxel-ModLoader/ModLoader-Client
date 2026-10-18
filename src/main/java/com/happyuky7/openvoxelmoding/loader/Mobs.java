@@ -92,7 +92,7 @@ final class Mobs {
                 m.moving = dist > 1.1;
                 if (dist < 1.6 && now - m.lastAttackNs > 1_000_000_000L && Math.abs(p.y - m.y) < 2.2) {
                     m.lastAttackNs = now;
-                    Survival.damage(e, 3f, true);
+                    Survival.damage(e, 3f, true, "zombie");
                 }
             } else if (m.wanderTimer <= 0) {
                 m.wanderTimer = 1.5 + RANDOM.nextDouble() * 4;

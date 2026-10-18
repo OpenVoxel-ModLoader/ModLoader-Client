@@ -64,7 +64,34 @@ final class Tiles {
     private static final Map<String, Texture> TEX = new HashMap<>();
 
     private static long key(int x, int y, int z) { return ((long) x & 0xFFFFFFL) << 40 | ((long) y & 0xFFFFL) << 24 | ((long) z & 0xFFFFFFL); }
-    static Tile at(int x, int y, int z) { return TILES.get(key(x, y, z)); }
+    /**
+     * The ModLoader block at a position. The block state is the source of truth (it carries the block
+     * code, so blocks placed by other players or saved in the world are found too); the map only adds
+     * per-block data such as chest contents.
+     */
+    static Tile at(int x, int y, int z) {
+        Tile t = TILES.get(key(x, y, z));
+        BlockRegistry.BlockDef def = defAt(x, y, z);
+        if (def == null) return t != null && !hasCode(x, y, z) ? t : null;
+        if (t == null || t.def != def) {
+            VoxelEngine e = VoxelEngine.getEngine();
+            long state = e != null && e.getWorld() != null ? e.getWorld().getState(x, y, z) : 0;
+            t = new Tile(def, x, y, z, BlockRegistry.facingIn(state), System.nanoTime() - 60_000_000_000L);
+            TILES.put(key(x, y, z), t);
+        }
+        return t;
+    }
+
+    static BlockRegistry.BlockDef defAt(int x, int y, int z) {
+        VoxelEngine e = VoxelEngine.getEngine();
+        if (e == null || e.getWorld() == null) return null;
+        try { return BlockRegistry.ofState(e.getWorld().getState(x, y, z)); } catch (Exception ex) { return null; }
+    }
+
+    private static boolean hasCode(int x, int y, int z) {
+        VoxelEngine e = VoxelEngine.getEngine();
+        try { return e != null && e.getWorld() != null && BlockRegistry.codeIn(e.getWorld().getState(x, y, z)) != 0; } catch (Exception ex) { return false; }
+    }
     static Collection<Tile> all() { return TILES.values(); }
 
     // ---- Placement & interaction -----------------------------------------------------
@@ -104,10 +131,13 @@ final class Tiles {
         BuiltinUI.select(e, BuiltinUI.selected);
     }
 
-    /** Called from the applyEdit hook when the base block got placed. */
+    /** Facing for a block placed now: the front looks back at the player. */
+    static int placementFacing(VoxelEngine e) { return e.getCamera() != null ? Math.floorMod(Math.round(e.getCamera().getYaw() / 90f), 4) : 0; }
+
+    /** Called from the applyEdit hook when the base block got placed (the state already carries the block code). */
     static void register(VoxelEngine e, int x, int y, int z) {
         if (pendingPlace == null) return;
-        int facing = e.getCamera() != null ? Math.floorMod(Math.round(e.getCamera().getYaw() / 90f), 4) : 0;
+        int facing = placementFacing(e);
         TILES.put(key(x, y, z), new Tile(pendingPlace, x, y, z, facing, System.nanoTime()));
         if (!Settings.isCreative() && pendingHeld != null && --pendingHeld.count <= 0) BuiltinUI.HOTBAR[BuiltinUI.selected] = null;
         BuiltinUI.sound().play("place");
@@ -115,12 +145,14 @@ final class Tiles {
     }
 
     /** Called when any block is broken; returns the block item to drop (chest contents are dropped too). */
-    static Items.Stack onBlockBroken(int x, int y, int z) {
+    static Items.Stack onBlockBroken(int x, int y, int z, long brokenState) {
         Tile tile = TILES.remove(key(x, y, z));
-        if (tile == null) return null;
-        if (tile.chest != null) for (Items.Stack s : tile.chest) if (s != null) Drops.spawn(s, x, y, z);
+        BlockRegistry.BlockDef def = BlockRegistry.ofState(brokenState);
+        if (def == null && tile != null) def = tile.def;
+        if (def == null) return null;
+        if (tile != null && tile.chest != null) for (Items.Stack s : tile.chest) if (s != null) Drops.spawn(s, x, y, z);
         save();
-        return tile.def.item != null ? Items.Stack.of(tile.def.item) : null;
+        return def.item != null ? Items.Stack.of(def.item) : null;
     }
 
     private static void sleep(VoxelEngine e, Tile bed) {
@@ -164,8 +196,13 @@ final class Tiles {
             if (now - t.placedNs < 5_000_000_000L) continue;
             try {
                 if (w.getChunkIfLoaded(Math.floorDiv(t.x, 16), Math.floorDiv(t.z, 16)) == null) continue;
-                int type = BlockState.typeId(w.getState(t.x, t.y, t.z));
-                if (type == t.def.base.getId()) continue;
+                long state = w.getState(t.x, t.y, t.z);
+                if (BlockRegistry.ofState(state) == t.def) continue;
+                if (BlockState.typeId(state) == t.def.base.getId() && BlockRegistry.codeIn(state) == 0) {
+                    // saved before 1.1: write the block code into the world so it meshes as a real block
+                    Hooks.applyEditOrig(e, t.x, t.y, t.z, new AbstractBlock(BlockRegistry.encode(state, t.def, t.facing)));
+                    continue;
+                }
                 if (!hasData(w, t.x, t.y, t.z)) continue;
                 ghosts.add(en.getKey());
             } catch (Exception ignored) { }
@@ -291,7 +328,7 @@ final class Tiles {
         "hhhhhhhhhhhhhhhh", "hAAAAAAAAAAAAAAh", "hAaaaaaaaaaaaaAh", "hAAAAAAAAAAAAAAh", "hhhhhhhhhhhhhhhh", "hAAAAAAAAAAAAAAh", "hAaaaaaaaaaaaaAh", "hhhhhhhhhhhhhhhh"};
     private static final String[] TABLE_SIDE = {
         "LLLLLLLLLLLLLLLL", "AAAAAAAAAAAAAAAA", "aaaaaaaaaaaaaaaa", "HHHHHHHHHHHHHHHH", "HhGGGhHHhhGGGhhH", "HhGhGhHHhhGhGhhH", "HhGGGhHHhhGGGhhH", "HhhhhhHHhhhhhhhH",
-        "HHHHHHHHHHHHHHHH", "HhhhhhhhhhhhhhhH", "HhhhhhhhhhhhhhhH", "HHHHHHHHHHHHHHHH", "HH............HH", "HH............HH", "HH............HH", "HH............HH"};
+        "HHHHHHHHHHHHHHHH", "HhhhhhhhhhhhhhhH", "HhhhhhhhhhhhhhhH", "HHHHHHHHHHHHHHHH", "HHhhhhhhhhhhhhHH", "HHhhhhhhhhhhhhHH", "HHhhhhhhhhhhhhHH", "HHhhhhhhhhhhhhHH"};
     private static final String[] CHEST_SIDE = {
         "hhhhhhhhhhhhhhhh", "hAAAAAAAAAAAAAAh", "hAAAAAAAAAAAAAAh", "hAAAAAAAAAAAAAAh", "hAaAAAAAAAAAAaAh", "hhhhhhhhhhhhhhhh", "hAAAAAAAAAAAAAAh", "hAAAAAAAAAAAAAAh",
         "hAaAAAAAAAAAAaAh", "hAAAAAAAAAAAAAAh", "hAAAAAAAAAAAAAAh", "hAaAAAAAAAAAAaAh", "hAAAAAAAAAAAAAAh", "hAAAAAAAAAAAAAAh", "hAAAAAAAAAAAAAAh", "hhhhhhhhhhhhhhhh"};
@@ -308,6 +345,11 @@ final class Tiles {
         "AAAAAAAAAAAAAAAA", "AAAAAAAAAAAAAAAA", "aaaaaaaaaaaaaaaa", "HHHHHHHHHHHHHHHH", "HhhhhhhhhhhhhhhH", "HHHHHHHHHHHHHHHH", "HH............HH", "HH............HH",
         "................", "................", "................", "................", "................", "................", "................", "................"};
 
+    /** Bed side for the chunk mesh: the slab shows the lower half of the texture, so repeat the visible frame there. */
+    private static final String[] BED_SIDE_MESH = {
+        "AAAAAAAAAAAAAAAA", "AAAAAAAAAAAAAAAA", "aaaaaaaaaaaaaaaa", "HHHHHHHHHHHHHHHH", "HhhhhhhhhhhhhhhH", "HHHHHHHHHHHHHHHH", "HHhhhhhhhhhhhhHH", "HHhhhhhhhhhhhhHH",
+        "AAAAAAAAAAAAAAAA", "AAAAAAAAAAAAAAAA", "aaaaaaaaaaaaaaaa", "HHHHHHHHHHHHHHHH", "HhhhhhhhhhhhhhhH", "HHHHHHHHHHHHHHHH", "HHhhhhhhhhhhhhHH", "HHhhhhhhhhhhhhHH"};
+
     private static Texture tex(String name, String[] rows, int[] palette) {
         Texture t = TEX.get(name);
         if (t == null) {
@@ -317,6 +359,26 @@ final class Tiles {
         return t;
     }
 
+    /**
+     * Creates the textures the chunk mesher uses for ModLoader blocks. Must run on the render thread
+     * (meshing threads only look them up). Returns true when new textures were made, so meshes can be rebuilt.
+     */
+    static boolean prepareTextures() {
+        boolean made = false;
+        for (BlockRegistry.BlockDef d : BlockRegistry.all()) {
+            if (d.meshTop != null) continue;
+            switch (d.kind) {
+                case OAK_PLANKS: { Texture t = tex("oak_planks", PLANKS_BLOCK, wood()); d.meshTop = t; d.meshSide = t; d.meshBottom = t; break; }
+                case CRAFTING_TABLE: d.meshSide = tex("table_side", TABLE_SIDE, wood()); d.meshBottom = tex("oak_planks", PLANKS_BLOCK, wood()); d.meshTop = tex("table_top", TABLE_TOP, wood()); break;
+                case CHEST: d.meshSide = tex("chest_side", CHEST_SIDE, wood()); d.meshFront = tex("chest_front", CHEST_FRONT, wood()); d.meshBottom = tex("chest_top", CHEST_TOP, wood()); d.meshTop = tex("chest_top", CHEST_TOP, wood()); break;
+                case BED: d.meshSide = tex("bed_side_mesh", BED_SIDE_MESH, bed()); d.meshBottom = tex("oak_planks", PLANKS_BLOCK, wood()); d.meshTop = tex("bed_top", BED_TOP, bed()); break;
+                default: d.meshSide = d.side(); d.meshBottom = d.bottom(); d.meshTop = d.top(); break;
+            }
+            made |= d.meshTop != null;
+        }
+        return made;
+    }
+
     private static int[] wood() { return new int[]{0xFFA06A3A, 0xFF6B4320, 0xFFC99A5E, 0xFF8A8A8A, 0xFF7A4A24, 0xFF5A3418, 0xFF3DA33D, 0xFFFFFFFF}; }
     private static int[] bed() { return new int[]{0xFFC43030, 0xFF8A1E1E, 0xFFF0F0F0, 0xFF8A8A8A, 0xFF7A4A24, 0xFF5A3418, 0xFF3DA33D, 0xFFE8E8E8}; }
 
@@ -324,7 +386,9 @@ final class Tiles {
     static void render(Renderer renderer, VoxelEngine e, Camera cam) {
         if (TILES.isEmpty()) return;
         Vector3d p = cam.getPosition();
+        World world = e.getWorld();
         for (Tile t : TILES.values()) {
+            if (t.def.kind != BlockRegistry.Kind.BED && world != null && BlockRegistry.ofState(world.getState(t.x, t.y, t.z)) == t.def && t.def.meshTop != null) continue;
             double rx = t.x - p.x, ry = t.y - p.y - 1.6, rz = t.z - p.z;
             if (rx * rx + ry * ry + rz * rz > 48 * 48) continue;
             float bright = HandRenderer.brightnessAt(e, renderer, t.x + 0.5, t.y + 0.5, t.z + 0.5);

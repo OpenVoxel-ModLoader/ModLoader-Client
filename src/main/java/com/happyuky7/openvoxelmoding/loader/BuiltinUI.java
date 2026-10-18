@@ -24,7 +24,7 @@ final class BuiltinUI {
     static int selected;
     private static final boolean[] held = new boolean[9];
     private static Field activeGuis;
-    private static boolean replacingInventory, initialized, dropWas;
+    private static boolean replacingInventory, initialized, dropWas, deathHandled;
     private static Object lastRenderer;
     private static long selectionChangedNs, lastNs;
     private static GLFWScrollCallback scroll;
@@ -85,6 +85,7 @@ final class BuiltinUI {
 
     private static void frame(VoxelEngine engine) throws Exception {
         if (!initialized) init(engine);
+        if (Tiles.prepareTextures() && engine.getRenderer() != null) engine.getRenderer().clearAllMeshes();
         syncAspect(engine);
         long now = System.nanoTime();
         float dt = lastNs == 0 ? 0.016f : Math.min(0.1f, (now - lastNs) / 1e9f);
@@ -116,6 +117,21 @@ final class BuiltinUI {
         }
         if (!engine.isWorldActive() || engine.getCamera() == null) return;
         Camera camera = engine.getCamera();
+        // Death (local or reported by the server): show the death screen once.
+        if (engine.getLocalPlayer() != null && engine.getLocalPlayer().dead) {
+            if (!(top instanceof DeathScreen)) {
+                if (!deathHandled) {
+                    deathHandled = true;
+                    // deaths reported by the server did not go through Survival.die(): drop the inventory here
+                    if (!Survival.diedLocally) { DeathScreen.cause = "generic"; Survival.dropEverything(engine); }
+                }
+                UIManager.get().closeAllGUIs();
+                UIManager.get().openGUI(new DeathScreen(engine));
+            }
+            return;
+        }
+        deathHandled = false;
+        Survival.diedLocally = false;
         // Keep the engine's hand in sync with the hotbar (middle click is handled by PickBlock).
         AbstractBlock inHand = camera.getBlockInHand();
         BlockType expected = HOTBAR[selected] != null && HOTBAR[selected].isBlock() ? HOTBAR[selected].block : BlockType.AIR;

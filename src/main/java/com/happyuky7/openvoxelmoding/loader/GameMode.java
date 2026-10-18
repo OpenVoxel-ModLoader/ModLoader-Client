@@ -114,7 +114,7 @@ final class GameMode {
         } else {
             if (!Double.isNaN(fallStart)) {
                 double distance = fallStart - pos.y;
-                if (distance > 3.0 && physics.getSubmergedLiquid() == null) Survival.damage(e, (float) Math.floor(distance - 3.0), true);
+                if (distance > 3.0 && physics.getSubmergedLiquid() == null) Survival.damage(e, (float) Math.floor(distance - 3.0), true, "fall");
             }
             fallStart = Double.NaN;
         }

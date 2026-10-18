@@ -45,10 +45,12 @@ final class Transformer implements ClassFileTransformer {
         wrap("net/openvoxel/client/net/AppearanceLoader", "apply", "(Ljava/lang/String;[BLjava/lang/String;Ljava/lang/String;)V", "appearanceApply");
         wrap("net/openvoxel/client/MainMenuScreen", "build", "(FF)V", "mainMenuBuild");
         wrap("net/openvoxel/engine/ui/PauseMenu", "build", "(FF)V", "pauseMenuBuild");
+        wrap("net/openvoxel/client/ErrorScreen", "build", "(FF)V", "errorScreenBuild");
         wrap("net/openvoxel/client/ClientMain", "startSingleplayer", "(Lnet/openvoxel/client/WorldSaves$Entry;)V", "startSingleplayer");
         wrap("net/openvoxel/client/ClientMain", "join", "(Ljava/lang/String;ILjava/lang/String;)V", "join");
         wrap("net/openvoxel/engine/ui/ChatHud", "addLine", "(Ljava/lang/String;)V", "chatLine");
         wrap("net/openvoxel/engine/world/block/BlockType", "getModel", "(J)Lnet/openvoxel/engine/world/block/model/BlockModel;", "blockModel");
+        wrap("net/openvoxel/engine/world/block/BlockType", "getTextureForFace", "(IJ)Lnet/openvoxel/engine/rendering/Texture;", "blockTexture");
         wrap("net/openvoxel/engine/world/block/BlockType", "computePlacementState", "(Lnet/openvoxel/engine/world/block/BlockPlacement$PlacementContext;J)J", "placementState");
         wrap("net/openvoxel/engine/world/block/BlockPlacement", "canReplaceInto", "(Lnet/openvoxel/engine/world/block/BlockType;Lnet/openvoxel/engine/world/block/BlockType;J)Z", "canReplaceInto");
     }
@@ -59,6 +61,13 @@ final class Transformer implements ClassFileTransformer {
     @Override
     public byte[] transform(ClassLoader loader, String className, Class<?> redefined, ProtectionDomain domain, byte[] bytes) {
         List<Target> targets = className == null ? null : TARGETS.get(className);
+        // Enum constants with bodies (BlockType$1, $2...) override some hooked methods: wrap those overrides too.
+        // Their renamed originals override BlockType's, so the hook's virtual call still reaches them.
+        if (targets == null && className != null && className.matches("net/openvoxel/engine/world/block/BlockType\\$\\d+")) {
+            List<Target> sub = new ArrayList<>();
+            for (Target t : TARGETS.get("net/openvoxel/engine/world/block/BlockType")) if (t.name.equals("getTextureForFace") || t.name.equals("getModel")) sub.add(t);
+            targets = sub;
+        }
         boolean redirect = className != null && REDIRECT_KEYS.contains(className);
         if (targets == null && !redirect) return null;
         if (targets == null) targets = Collections.emptyList();

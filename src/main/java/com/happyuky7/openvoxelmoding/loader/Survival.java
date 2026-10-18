@@ -26,7 +26,12 @@ final class Survival {
     private static final int[] DRUMSTICK = {0b00000110, 0b00001111, 0b00011111, 0b00111110, 0b01111100, 0b11111000, 0b11110000, 0b01100000};
     private static final int[] ARMOR_ICON = {0b11000011, 0b11100111, 0b11111111, 0b01111110, 0b00111100, 0b00111100, 0b00111100, 0b00011000};
 
-    static void reset() { hunger = 20f; exhaustion = 0; lastX = Double.NaN; }
+    /** How many stacks were dropped at the last death (shown on the death screen). */
+    static int droppedOnDeath;
+    /** Set by die(): the death screen then knows the inventory was already dropped. */
+    static boolean diedLocally;
+
+    static void reset() { hunger = 20f; exhaustion = 0; lastX = Double.NaN; eating = 0f; }
 
     static int armorPoints() {
         int p = 0;
@@ -79,13 +84,43 @@ final class Survival {
         rightWas = right;
     }
 
-    static void damage(VoxelEngine e, float amount, boolean useArmor) {
+    static void damage(VoxelEngine e, float amount, boolean useArmor) { damage(e, amount, useArmor, "generic"); }
+
+    /** {@code cause}: fall, zombie, starve, generic (used for the death message). */
+    static void damage(VoxelEngine e, float amount, boolean useArmor, String cause) {
         PlayerEntity p = e.getLocalPlayer();
         if (p == null || p.dead || amount <= 0 || Settings.isCreative()) return;
         if (useArmor) amount = applyArmor(amount);
         p.health = Math.max(0f, p.health - amount);
         BuiltinUI.sound().play("hurt");
-        if (p.health <= 0f) { p.dead = true; ChatHud.addLine("&c" + Lang.t("death.fall", p.username)); }
+        if (p.health <= 0f) die(e, cause);
+    }
+
+    /** Local death: message, inventory dropped where you died (survival), death screen opens next frame. */
+    static void die(VoxelEngine e, String cause) {
+        PlayerEntity p = e.getLocalPlayer();
+        if (p == null) return;
+        p.dead = true;
+        diedLocally = true;
+        DeathScreen.cause = cause;
+        String name = p.username != null && !p.username.isEmpty() ? p.username : "Player";
+        ChatHud.addLine("&c" + Lang.t("death." + cause, name));
+        dropEverything(e);
+    }
+
+    static void dropEverything(VoxelEngine e) {
+        droppedOnDeath = 0;
+        if (Settings.isCreative() || e.getCamera() == null) return;
+        Vector3d pos = e.getCamera().getPosition();
+        int bx = (int) Math.floor(pos.x), by = (int) Math.floor(pos.y), bz = (int) Math.floor(pos.z);
+        Items.Stack[][] areas = {BuiltinUI.HOTBAR, BuiltinUI.STORAGE, ARMOR};
+        for (Items.Stack[] area : areas) for (int i = 0; i < area.length; i++) {
+            if (area[i] == null) continue;
+            Drops.spawnDeath(area[i], bx, by, bz);
+            area[i] = null;
+            droppedOnDeath++;
+        }
+        BuiltinUI.select(e, BuiltinUI.selected);
     }
 
     /** Hearts, hunger and armor above the hotbar (survival only). Expects 2D rendering already set up. */

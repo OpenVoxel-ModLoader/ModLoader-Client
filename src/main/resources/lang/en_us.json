@@ -177,5 +177,21 @@
   "mob.pig": "Pig",
   "mob.zombie": "Zombie",
   "item.porkchop": "Porkchop",
-  "item.rotten_flesh": "Rotten flesh"
+  "item.rotten_flesh": "Rotten flesh",
+  "death.title": "You died!",
+  "death.respawn": "Respawn",
+  "death.titleScreen": "Title screen",
+  "death.dropped": "Your items (%d stacks) were dropped where you died.",
+  "death.zombie": "%s was slain by a Zombie",
+  "death.starve": "%s starved to death",
+  "death.generic": "%s died",
+  "kick.protocol.title": "Different game version",
+  "kick.protocol": "This server runs another OpenVoxel build. You are on %s (protocol %d). ModLoader servers use 0.0.8-Debug (protocol 9): pick that version in the launcher.",
+  "kick.session": "Your session is not valid for this server. Log in again in Account (pause menu or main menu).",
+  "kick.full": "The server is full.",
+  "kick.generic": "Disconnected: %s",
+  "kick.refused": "Nothing answered at that address: the server is off, the port is wrong or a firewall blocks it.",
+  "kick.timeout": "The server did not answer in time. Check the address and your connection.",
+  "kick.unknownHost": "That server address does not exist. Check the spelling in the server list.",
+  "kick.protocol.server": "This server runs a different OpenVoxel build than yours. You are on %s (protocol %d), the one ModLoader uses, so the server is the one out of date: ask its owner to update it."
 }

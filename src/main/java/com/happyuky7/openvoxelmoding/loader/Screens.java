@@ -61,7 +61,7 @@ final class Screens {
         list.add(new Button(cx + gap / 2, y3, half, bh, t("menu.account"), b -> UIManager.get().openGUI(new AccountScreen(null, iw, ih))));
         list.add(new Button(cx - bw / 2, y3 + bh + gap, bw, bh, t("menu.quit"), b -> VoxelEngine.getEngine().stop()));
         float[] dim = net.openvoxel.engine.ui.Theme.TEXT_DIM;
-        list.add(new Label(14, h - 24, "OpenVoxel " + VoxelEngine.getEngine().getVersion() + "  ·  " + Agent.NAME + " " + Agent.VERSION).color(dim[0], dim[1], dim[2], dim[3]));
+        list.add(new Label(14, h - 24, "OpenVoxel " + GameBuild.id() + " (protocol " + GameBuild.protocol() + ")  ·  " + Agent.NAME + " " + Agent.VERSION).color(dim[0], dim[1], dim[2], dim[3]));
         String site = "open-voxel.net";
         list.add(new Label(w - GLUIRenderer.getTextWidth(site) - 14, h - 24, site).color(dim[0], dim[1], dim[2], dim[3]));
     }
