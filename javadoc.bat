@@ -1,0 +1,13 @@
+@echo off
+rem Generates the public API Javadoc into dist\javadoc (needs the game jar: OPENVOXEL_GAME_JAR or the launcher install).
+setlocal
+cd /d "%~dp0"
+set "GAME=%OPENVOXEL_GAME_JAR%"
+if "%GAME%"=="" if exist "..\..\..\Game\versions\0.0.8-Debug\openvoxel-0.0.8-Debug.jar" set "GAME=..\..\..\Game\versions\0.0.8-Debug\openvoxel-0.0.8-Debug.jar"
+if "%GAME%"=="" if exist "game\openvoxel.jar" set "GAME=game\openvoxel.jar"
+if "%GAME%"=="" ( echo Game JAR not found; set OPENVOXEL_GAME_JAR. & exit /b 1 )
+set "P=src\main\java\com\happyuky7\openvoxelmoding\loader"
+if exist dist\javadoc rmdir /s /q dist\javadoc
+javadoc --release 11 -quiet -Xdoclint:none -encoding UTF-8 -charset UTF-8 -windowtitle "OpenVoxel ModLoader API" -doctitle "OpenVoxel ModLoader client API" -sourcepath src\main\java -classpath "%GAME%;lib\asm-9.7.1.jar;lib\asm-tree-9.7.1.jar" -link https://docs.oracle.com/en/java/javase/11/docs/api/ -d dist\javadoc %P%\ClientMod.java %P%\ModContext.java %P%\ModConfig.java %P%\NativeBlocks.java %P%\Lang.java
+if errorlevel 1 exit /b 1
+echo Javadoc in dist\javadoc

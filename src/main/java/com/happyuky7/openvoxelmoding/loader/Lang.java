@@ -24,8 +24,14 @@ public final class Lang {
 
     static void registerModJar(Path jar) { MOD_JARS.add(jar); }
 
+    /** @return the active language code, e.g. {@code en_us} */
     public static String current() { return code; }
 
+    /**
+     * Switches the active language (English stays loaded as the fallback).
+     *
+     * @param languageCode code such as {@code es_es}; null or empty means {@code en_us}
+     */
     public static void load(String languageCode) {
         code = languageCode == null || languageCode.isEmpty() ? "en_us" : languageCode;
         EN.clear(); CURRENT.clear();
@@ -33,6 +39,13 @@ public final class Lang {
         if (!code.equals("en_us")) loadInto(CURRENT, code);
     }
 
+    /**
+     * Translates a key: current language, then English, then the key itself.
+     *
+     * @param key translation key
+     * @param args {@link String#format} arguments for the placeholders
+     * @return translated text
+     */
     public static String t(String key, Object... args) {
         String s = CURRENT.get(key);
         if (s == null) s = EN.get(key);
@@ -45,7 +58,7 @@ public final class Lang {
         try { return String.format(s, args); } catch (Exception e) { return s; }
     }
 
-    /** Language codes that have at least one source, with their display names. */
+    /** @return language codes that have at least one source (loader, mods, instance/lang), with display names */
     public static LinkedHashMap<String, String> available() {
         LinkedHashMap<String, String> out = new LinkedHashMap<>();
         for (String c : BUNDLED) out.put(c, c);
