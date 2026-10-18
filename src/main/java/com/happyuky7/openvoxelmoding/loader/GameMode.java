@@ -20,7 +20,10 @@ final class GameMode {
 
     static boolean skipPhysics() { return flying && Settings.isCreative(); }
 
-    static void set(String mode) {
+    /** Requests a game mode: on a ModLoader server the server decides (ops only), otherwise applied locally. */
+    static void set(String mode) { Net.requestGameMode(VoxelEngine.getEngine(), mode.equals("survival") ? "survival" : "creative"); }
+
+    static void setLocal(String mode) {
         Settings.gameMode = mode.equals("survival") ? "survival" : "creative";
         if (!Settings.isCreative()) flying = false;
         else {

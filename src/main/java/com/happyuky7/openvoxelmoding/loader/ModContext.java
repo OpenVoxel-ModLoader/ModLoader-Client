@@ -83,6 +83,9 @@ public final class ModContext {
     }
 
     /** Item id or block name of the selected hotbar slot, or null when empty. */
+    /** Selects a hotbar slot (0-8). */
+    public void setHotbarSlot(int slot) { BuiltinUI.select(engine(), Math.max(0, Math.min(8, slot))); }
+
     public String getHeldItem() {
         Items.Stack s = BuiltinUI.held();
         return s == null ? null : s.isBlock() ? s.block.name().toLowerCase() : s.item.id;

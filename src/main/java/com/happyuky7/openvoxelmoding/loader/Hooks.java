@@ -194,7 +194,48 @@ public final class Hooks {
     public static void sendChat(Object engine, String message) {
         Chat.recordSent(message);
         if (message != null && message.startsWith("/") && ClientCommands.handle(message)) return;
+        sendChatOrig(engine, message);
+    }
+
+    static void sendChatOrig(Object engine, String message) {
         try { orig("net.openvoxel.engine.VoxelEngine", "sendChat", false, void.class, String.class).invoke(engine, message); }
+        catch (Throwable t) { throw rethrow(t); }
+    }
+
+    /** Incoming chat lines: ModLoader server control messages are consumed here. */
+    public static void chatLine(String text) {
+        try { if (Net.handleLine(text)) return; } catch (Throwable error) { System.err.println("[ModLoader] chat line: " + error); }
+        try { orig("net.openvoxel.engine.ui.ChatHud", "addLine", true, void.class, String.class).invoke(text); }
+        catch (Throwable t) { throw rethrow(t); }
+    }
+
+    // ---- Blocks (torches) --------------------------------------------------------------
+
+    public static net.openvoxel.engine.world.block.model.BlockModel blockModel(Object type, long state) {
+        net.openvoxel.engine.world.block.model.BlockModel base;
+        try { base = (net.openvoxel.engine.world.block.model.BlockModel) orig("net.openvoxel.engine.world.block.BlockType", "getModel", false, net.openvoxel.engine.world.block.model.BlockModel.class, long.class).invoke(type, state); }
+        catch (Throwable t) { throw rethrow(t); }
+        try { if (type == BlockType.TORCH && Torches.isWall(state)) return Torches.wallModel(base, Torches.facing(state)); }
+        catch (Throwable error) { System.err.println("[ModLoader] torch model: " + error); }
+        return base;
+    }
+
+    public static long placementState(Object type, net.openvoxel.engine.world.block.BlockPlacement.PlacementContext ctx, long base) {
+        if (type == BlockType.TORCH) try { return Torches.placementState(ctx, base); } catch (Throwable ignored) { }
+        try { return (long) orig("net.openvoxel.engine.world.block.BlockType", "computePlacementState", false, long.class, net.openvoxel.engine.world.block.BlockPlacement.PlacementContext.class, long.class).invoke(type, ctx, base); }
+        catch (Throwable t) { throw rethrow(t); }
+    }
+
+    /** Torches are never replaced by a placed block (the block goes next to them, like Minecraft). */
+    public static boolean canReplaceInto(BlockType held, BlockType existing, long existingState) {
+        if (existing == BlockType.TORCH) return false;
+        try { return (boolean) orig("net.openvoxel.engine.world.block.BlockPlacement", "canReplaceInto", true, boolean.class, BlockType.class, BlockType.class, long.class).invoke(held, existing, existingState); }
+        catch (Throwable t) { throw rethrow(t); }
+    }
+
+
+    static void applyEditOrig(VoxelEngine e, int x, int y, int z, net.openvoxel.engine.world.AbstractBlock block) {
+        try { orig("net.openvoxel.engine.VoxelEngine", "applyEdit", false, void.class, int.class, int.class, int.class, net.openvoxel.engine.world.AbstractBlock.class).invoke(e, x, y, z, block); }
         catch (Throwable t) { throw rethrow(t); }
     }
 
@@ -205,6 +246,7 @@ public final class Hooks {
         try {
             if (event instanceof net.openvoxel.engine.events.player.ClickEvent && e != null) {
                 net.openvoxel.engine.events.player.ClickEvent click = (net.openvoxel.engine.events.player.ClickEvent) event;
+                if (click.type == net.openvoxel.engine.events.player.ClickEvent.ClickType.LEFT && Mobs.suppressBlockClick()) return;
                 if (click.type == net.openvoxel.engine.events.player.ClickEvent.ClickType.RIGHT) {
                     if (Tiles.onRightClick(e, click)) return;
                     tilePlacement = Tiles.pendingPlace != null;
@@ -226,6 +268,10 @@ public final class Hooks {
         }
         boolean survival = active && !Settings.isCreative();
         if (survival && block.getType() == BlockType.AIR && !Mining.approved) return; // instant click: wait for the timer
+        // Torches need support: a solid block below, or behind a wall torch.
+        if (active && block.getType() == BlockType.TORCH && before != BlockType.TORCH) {
+            try { if (!Torches.supported(e.getWorld(), x, y, z, block.getState())) return; } catch (Throwable ignored) { }
+        }
         try { orig("net.openvoxel.engine.VoxelEngine", "applyEdit", false, void.class, int.class, int.class, int.class, net.openvoxel.engine.world.AbstractBlock.class).invoke(engine, x, y, z, block); }
         catch (Throwable t) { throw rethrow(t); }
         if (!active || before == null) return;
@@ -233,6 +279,7 @@ public final class Hooks {
             if (block.getType() == BlockType.AIR) {
                 if (survival && before != BlockType.AIR) Mining.onBroken(before, x, y, z);
                 else if (before != BlockType.AIR) { Items.Stack tile = Tiles.onBlockBroken(x, y, z); if (tile != null) Drops.spawn(tile, x, y, z); }
+                if (before != BlockType.AIR) Torches.onBlockRemoved(e, x, y, z);
             } else if (block.getType() != before) {
                 if (Tiles.pendingPlace != null && block.getType() == Tiles.pendingPlace.base) Tiles.register(e, x, y, z);
                 else if (survival) { Items.Stack held = BuiltinUI.held(); if (held != null && held.block == block.getType()) Mining.onPlaced(); }

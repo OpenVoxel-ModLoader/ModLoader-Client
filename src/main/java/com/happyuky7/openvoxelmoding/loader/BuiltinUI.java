@@ -85,6 +85,7 @@ final class BuiltinUI {
 
     private static void frame(VoxelEngine engine) throws Exception {
         if (!initialized) init(engine);
+        syncAspect(engine);
         long now = System.nanoTime();
         float dt = lastNs == 0 ? 0.016f : Math.min(0.1f, (now - lastNs) / 1e9f);
         lastNs = now;
@@ -94,6 +95,8 @@ final class BuiltinUI {
         Mining.tick(engine, dt);
         Drops.tick(engine, dt);
         Tiles.tick(dt);
+        Net.tick(engine);
+        Mobs.tick(engine, dt);
         HandRenderer.tick(engine);
         GUI top = topGui();
         if (top instanceof PlayerInventory) {
@@ -108,8 +111,8 @@ final class BuiltinUI {
         Object renderer = engine.getRenderer();
         if (renderer != lastRenderer) {
             lastRenderer = renderer;
-            if (renderer != null) { Skins.onWorldEnter(); Survival.reset(); SOUND.rescan(); Tiles.load(engine); if (Settings.musicVolume > 0) Music.start(); }
-            else { Drops.clear(); Music.stop(); Tiles.unload(); }
+            if (renderer != null) { Skins.onWorldEnter(); Survival.reset(); SOUND.rescan(); Tiles.load(engine); Net.onWorldEnter(engine); if (Settings.musicVolume > 0) Music.start(); }
+            else { Drops.clear(); Mobs.clear(); Music.stop(); Tiles.unload(); Net.onWorldExit(); }
         }
         if (!engine.isWorldActive() || engine.getCamera() == null) return;
         Camera camera = engine.getCamera();
@@ -143,7 +146,25 @@ final class BuiltinUI {
             drawHotbar(size[0], size[1]);
             if (!Settings.isCreative()) Mining.renderHud(size[0], size[1]);
             Tiles.renderHud(size[0], size[1]);
+            if (Net.listKeyDown() || Boolean.getBoolean("ml.tablist")) Net.renderPlayerList(size[0], size[1]);
         } finally { GLUIRenderer.restore3DRendering(); }
+    }
+
+    /**
+     * The engine creates the camera at 1280x720 and only updates it from the resize callback, so a
+     * window that was already maximized draws the HUD/menus stretched while clicks arrive in real
+     * pixels (buttons "stop working" on big windows). Keep the camera at the framebuffer size.
+     */
+    private static void syncAspect(VoxelEngine engine) {
+        Camera cam = engine.getCamera();
+        if (cam == null) return;
+        int[] w = new int[1], h = new int[1];
+        GLFW.glfwGetFramebufferSize(UIManager.get().getWindow(), w, h);
+        int[] a = cam.getAspect();
+        if (w[0] > 0 && h[0] > 0 && (a[0] != w[0] || a[1] != h[0])) {
+            cam.setAspect(w[0], h[0]);
+            org.lwjgl.opengl.GL11.glViewport(0, 0, w[0], h[0]);
+        }
     }
 
     static void select(VoxelEngine engine, int slot) {

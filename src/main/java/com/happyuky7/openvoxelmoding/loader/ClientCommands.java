@@ -27,8 +27,7 @@ final class ClientCommands {
             String m = args[0].toLowerCase();
             if (m.equals("c") || m.equals("creative") || m.equals("1")) GameMode.set("creative");
             else if (m.equals("s") || m.equals("survival") || m.equals("0")) GameMode.set("survival");
-            else { ChatHud.addLine("&cUnknown game mode: " + args[0]); return; }
-            ChatHud.addLine("&7Set own game mode to &e" + GameMode.label());
+            else ChatHud.addLine("&cUnknown game mode: " + args[0]);
         });
         register("gm", "alias of /gamemode", args -> COMMANDS.get("gamemode").handler.run(args));
         register("fly", "toggle flight in creative", args -> {
@@ -70,6 +69,29 @@ final class ClientCommands {
                 case "reload": Music.reload(); BuiltinUI.sound().rescan(); ChatHud.addLine("&7Reloaded " + Music.list().size() + " track(s) and the sound pack"); break;
                 default: ChatHud.addLine("&7Tracks (" + Music.list().size() + "): &e" + String.join(", ", Music.list()) + (Music.isPlaying() ? " &7now: &a" + Music.current() : ""));
             }
+        });
+        register("mobs", "<on|off|clear|count|spawn [pig|zombie]> - client-side mobs", args -> {
+            String sub = args.length > 0 ? args[0].toLowerCase() : "count";
+            switch (sub) {
+                case "spawn": {
+                    net.openvoxel.engine.VoxelEngine e = net.openvoxel.engine.VoxelEngine.getEngine();
+                    String kind = args.length > 1 ? args[1].toLowerCase() : "pig";
+                    if (e == null || e.getCamera() == null) return;
+                    Mobs.Kind k = kind.startsWith("z") ? Mobs.Kind.ZOMBIE : Mobs.Kind.PIG;
+                    Mobs.spawnInFront(e, k);
+                    ChatHud.addLine("&7Spawned &e" + k.label());
+                    break;
+                }
+                case "on": Mobs.enabled = true; ChatHud.addLine("&7Mobs &aenabled"); break;
+                case "off": Mobs.enabled = false; Mobs.clear(); ChatHud.addLine("&7Mobs &cdisabled"); break;
+                case "clear": Mobs.clear(); ChatHud.addLine("&7Mobs removed"); break;
+                default: ChatHud.addLine("&7Mobs nearby: &e" + Mobs.count() + (Mobs.enabled ? "" : " &c(disabled)"));
+            }
+        });
+        register("clear", "clear the hotbar and inventory", args -> {
+            java.util.Arrays.fill(BuiltinUI.HOTBAR, null); java.util.Arrays.fill(BuiltinUI.STORAGE, null);
+            BuiltinUI.select(net.openvoxel.engine.VoxelEngine.getEngine(), BuiltinUI.selected);
+            ChatHud.addLine("&7Inventory cleared");
         });
         register("chelp", "list client commands", args -> help());
     }

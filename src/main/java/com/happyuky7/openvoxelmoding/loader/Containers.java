@@ -32,16 +32,18 @@ final class Containers {
 
         abstract void layout();
         void onChanged() {}
+        /** Horizontal shift of the window (the recipe book opens to the left). */
+        float windowShift() { return 0; }
+        void relayout() { px = (width - pw) / 2f + windowShift(); py = (height - ph) / 2f; slots.clear(); layout(); }
 
         @Override public void onOpen() {
             int[] s = Mc.windowSize(); width = s[0]; height = s[1];
-            px = (width - pw) / 2f; py = (height - ph) / 2f;
             if (engine.getCamera() != null && engine.getCamera().getInputHandler() != null) engine.getCamera().getInputHandler().paused = true;
-            slots.clear(); layout(); onChanged();
+            relayout(); onChanged();
         }
         @Override public void onTick(long ticks) {
             int[] s = Mc.windowSize();
-            if (s[0] != width || s[1] != height) { width = s[0]; height = s[1]; px = (width - pw) / 2f; py = (height - ph) / 2f; slots.clear(); layout(); }
+            if (s[0] != width || s[1] != height) { width = s[0]; height = s[1]; relayout(); }
         }
 
         /** Player storage (27) + hotbar (9) at the bottom of the window. */
@@ -50,10 +52,13 @@ final class Containers {
             for (int i = 0; i < 9; i++) slots.add(new Slot(BuiltinUI.HOTBAR, i, x + i * (SLOT + GAP), y + 3 * (SLOT + GAP) + 10, false, false));
         }
 
+        void renderBefore(float[] mouse) {}
+
         @Override public void render() {
             GLUIRenderer.setup2DRendering(width, height);
             try {
                 GLUIRenderer.drawPanel(0, 0, width, height, 0, 0, 0, 0.6f);
+                renderBefore(Mc.mouse());
                 Mc.window(px, py, pw, ph);
                 float[] d = Mc.TEXT_DARK;
                 GLUIRenderer.drawText(title, px + 16, py + 26, d[0], d[1], d[2], 1f);
@@ -100,7 +105,11 @@ final class Containers {
             return false;
         }
 
+        /** First chance for subclasses (recipe book); return true to consume the click. */
+        boolean clickBefore(int mx, int my, int button) { return false; }
+
         @Override public void onMouseClick(int mx, int my, int button) {
+            if (clickBefore(mx, my, button)) return;
             Slot s = hit(mx, my);
             if (s == null) {
                 if (carried != null && button == 0 && !GLUIRenderer.isPointInRect(mx, my, px, py, pw, ph)) { Drops.throwFromPlayer(engine, carried); carried = null; }
@@ -158,22 +167,38 @@ final class Containers {
 
     // ---- Crafting ----------------------------------------------------------------------
 
-    static final class CraftingScreen extends ContainerScreen {
+    static final class CraftingScreen extends ContainerScreen implements RecipeBook.Host {
         final int size; final Items.Stack[] grid; final Items.Stack[] result = new Items.Stack[1];
+        final RecipeBook book = new RecipeBook(this);
         CraftingScreen(VoxelEngine engine, int size) { super(engine, Lang.t("container.crafting"), 9 * (SLOT + GAP) - GAP + 32, 60 + size * (SLOT + GAP) + 24 + 4 * (SLOT + GAP) + 26); this.size = size; grid = new Items.Stack[size * size]; }
+        private float gx() { return px + 16 + (size == 2 ? 2 * (SLOT + GAP) : 0); }
+        private float gy() { return py + 44; }
+        private float bookX() { return px + pw - 16 - 28; }
+        private float bookY() { return gy() + ((size - 1) * (SLOT + GAP)) / 2f + SLOT / 2 - 12; }
+        @Override float windowShift() { return book.open ? (RecipeBook.W + 8) / 2f : 0; }
         @Override void layout() {
-            float gx = px + 16 + (size == 2 ? 2 * (SLOT + GAP) : 0), gy = py + 44;
+            float gx = gx(), gy = gy();
             for (int i = 0; i < size * size; i++) slots.add(new Slot(grid, i, gx + (i % size) * (SLOT + GAP), gy + (i / size) * (SLOT + GAP), false, true));
             float rx = gx + size * (SLOT + GAP) + 50, ry = gy + ((size - 1) * (SLOT + GAP)) / 2f;
             slots.add(new Slot(result, 0, rx, ry, true, true));
             addPlayerInventory(px + 16, gy + size * (SLOT + GAP) + 24);
         }
+        @Override void renderBefore(float[] mouse) { book.layout(px, py, ph); book.render(mouse); }
         @Override void renderExtra() {
-            float gx = px + 16 + (size == 2 ? 2 * (SLOT + GAP) : 0), gy = py + 44;
+            float gx = gx(), gy = gy();
             float ax = gx + size * (SLOT + GAP) + 10, ay = gy + ((size - 1) * (SLOT + GAP)) / 2f + SLOT / 2;
             GLUIRenderer.drawRect(ax, ay - 3, 24, 6, 0.3f, 0.3f, 0.3f, 1);
             GLUIRenderer.drawRect(ax + 22, ay - 8, 6, 16, 0.3f, 0.3f, 0.3f, 1);
+            RecipeBook.drawToggle(bookX(), bookY(), Mc.mouse());
         }
+        @Override boolean clickBefore(int mx, int my, int button) {
+            if (book.click(mx, my, button)) { afterChange(); return true; }
+            if (RecipeBook.toggleHit(bookX(), bookY(), mx, my)) { book.open = !book.open; relayout(); BuiltinUI.sound().play("click"); return true; }
+            return false;
+        }
+        @Override public int gridSize() { return size; }
+        @Override public Items.Stack[] grid() { return grid; }
+        @Override public void gridChanged() { onChanged(); }
         @Override void onChanged() { result[0] = Recipes.resultOf(grid, size); }
         @Override void onResultTaken() { Recipes.consume(grid); }
         @Override public void onClose() {

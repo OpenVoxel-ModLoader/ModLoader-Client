@@ -68,7 +68,7 @@ final class Items {
         void drawIcon(float cx, float cy, float size) {
             if (block != null) BlockIconRenderer.drawBlockIcon(block, cx, cy, size);
             else { Texture t = item.texture(); if (t != null) GLUIRenderer.drawTexture(t, cx - size * 0.7f, cy - size * 0.7f, size * 1.4f, size * 1.4f); }
-            if (count > 1 && !Settings.isCreative()) {
+            if (count > 1) {
                 String n = Integer.toString(count);
                 Mc.text(n, cx + size * 0.75f - GLUIRenderer.getTextWidth(n), cy + size * 0.8f, Mc.TEXT);
             }
@@ -103,6 +103,10 @@ final class Items {
         "................", "................", "............Hh..", "...........Hh...", "..........Hh....", ".........Hh.....",
         "........Hh......", ".......Hh.......", "......Hh........", ".....Hh.........", "....Hh..........", "...Hh...........",
         "..Hh............", "................", "................", "................"};
+    private static final String[] PLANKS = {
+        "hhhhhhhhhhhhhhhh", "hAAAAAAAAAAAAAAh", "hAaaaaaaaaaaaaAh", "hAAAAAAAAAAAAAAh", "hhhhhhhhhhhhhhhh", "hAAAAAAAAAAAAAAh",
+        "hAaaaaaaaaaaaaAh", "hAAAAAAAAAAAAAAh", "hhhhhhhhhhhhhhhh", "hAAAAAAAAAAAAAAh", "hAaaaaaaaaaaaaAh", "hAAAAAAAAAAAAAAh",
+        "hhhhhhhhhhhhhhhh", "hAAAAAAAAAAAAAAh", "hAaaaaaaaaaaaaAh", "hhhhhhhhhhhhhhhh"};
     private static final String[] INGOT = {
         "................", "................", "................", "................", "......LLLLLLLA..", ".....LLLLLLLAAa.",
         "....LLLLLLAAAAa.", "...LAAAAAAAAAAa.", "..LAAAAAAAAAaa..", "..AAAAAAAAaaa...", "..aaaaaaaaaa....", "................",
@@ -120,9 +124,9 @@ final class Items {
         ".HhhhhhHHhhhhhH.", ".HhGGGhHHhhhhhH.", ".HhGhGhHHhhhhhH.", ".HhGGGhHHhhhhhH.", ".HhhhhhHHhhhhhH.", ".HHHHHHHHHHHHHH.",
         ".HH..........HH.", ".HH..........HH.", ".HH..........HH.", "................"};
     private static final String[] CHEST = {
-        "................", "..HHHHHHHHHHHH..", ".HhhhhhhhhhhhhH.", ".HhhhhhhhhhhhhH.", ".HhhhhhhhhhhhhH.", ".HHHHHHGGHHHHHH.",
-        ".HhhhhhGGhhhhhH.", ".HhhhhhhhhhhhhH.", ".HhhhhhhhhhhhhH.", ".HhhhhhhhhhhhhH.", ".HhhhhhhhhhhhhH.", ".HhhhhhhhhhhhhH.",
-        ".HhhhhhhhhhhhhH.", "..HHHHHHHHHHHH..", "................", "................"};
+        "................", ".hhhhhhhhhhhhhh.", ".hLAAAAAAAAAAAh.", ".hAAAAAAAAAAAAh.", ".hAAAAAAAAAAAAh.", ".hAAAAAAAAAAAAh.",
+        ".hhhhhhhGGhhhhh.", ".hAAAAAAGGAAAAh.", ".hAAAAAAaaAAAAh.", ".hAAAAAAAAAAAAh.", ".hAaAAAAAAAAaAh.", ".hAAAAAAAAAAAAh.",
+        ".hAAAAAAAAAAAAh.", ".hAaAAAAAAAAaAh.", ".hhhhhhhhhhhhhh.", "................"};
     private static final String[] BED = {
         "................", "................", "................", "................", "..LLL...........", ".LWWWLAAAAAAAAA.", ".LWWWLAAAAAAAAa.",
         ".LLLLLAAAAAAAAa.", ".HHHHHHHHHHHHHH.", ".HhhhhhhhhhhhhH.", ".HH..........HH.", ".HH..........HH.", "................",
@@ -192,6 +196,7 @@ final class Items {
         String[][] shapes = {HELMET, CHESTPLATE, LEGGINGS, BOOTS};
         for (int t = 0; t < armorTiers.length; t++)
             for (int k = 0; k < 4; k++) add(new Item(armorTiers[t] + "_" + names[k], kinds[k], armorTiers[t], armorPoints[t][k], TIERS.get(armorTiers[t]), shapes[k]));
+        add(new Item("oak_planks", Kind.TILE, "wood", 0, pal(0xFFA06A3A, 0xFF6B4320, 0xFFC99A5E), PLANKS));
         add(new Item("stick", Kind.MATERIAL, "wood", 0, pal(0xFF8B5A2B, 0xFF5E3A18, 0xFFB07A42), STICK));
         add(new Item("coal", Kind.MATERIAL, "coal", 0, pal(0xFF2B2B2B, 0xFF111111, 0xFF4A4A4A), COAL));
         add(new Item("copper_ingot", Kind.MATERIAL, "copper", 0, pal(0xFFC87533, 0xFF8A4A1E, 0xFFE8A26A), INGOT));
@@ -208,6 +213,8 @@ final class Items {
         add(new Item("golden_apple", Kind.FOOD, "food", 4, pal(0xFFF2D13B, 0xFFB08A10, 0xFFFFF4A0), APPLE));
         add(new Item("bread", Kind.FOOD, "food", 5, pal(0xFFC98A3E, 0xFF8A5A22, 0xFFE8C078), BREAD));
         add(new Item("cooked_beef", Kind.FOOD, "food", 8, pal(0xFF7A4A2A, 0xFF4A2A14, 0xFFC97A7A), BEEF));
+        add(new Item("porkchop", Kind.FOOD, "food", 3, pal(0xFFE89AA0, 0xFFB05A60, 0xFFF7C9CC), BEEF));
+        add(new Item("rotten_flesh", Kind.FOOD, "food", 2, pal(0xFF7A5A3A, 0xFF4A3220, 0xFF9A8A5A), BEEF));
     }
 
     static Item byId(String id) { return BY_ID.get(id); }

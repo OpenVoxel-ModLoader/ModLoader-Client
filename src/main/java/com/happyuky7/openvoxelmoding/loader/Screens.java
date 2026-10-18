@@ -411,38 +411,48 @@ final class Screens {
 
     // ---- Inventory ---------------------------------------------------------------------
 
-    static final class McInventory extends GUI {
+    static final class McInventory extends GUI implements RecipeBook.Host {
         private final VoxelEngine engine;
-        private final List<Items.Stack> blocks = new ArrayList<>(), tools = new ArrayList<>(), combat = new ArrayList<>(), food = new ArrayList<>();
+        private final List<List<Items.Stack>> palettes = new ArrayList<>();
+        private final List<Items.Stack> tabIcons = new ArrayList<>();
+        private static final int TAB_INVENTORY = 5, TABS = 6;
         private int tab, page;
         private Items.Stack carried;
         /** Survival 2x2 crafting grid + result, like the vanilla inventory. */
         private final Items.Stack[] craft = new Items.Stack[4];
         private Items.Stack craftResult;
+        private final RecipeBook book = new RecipeBook(this);
         private int width, height;
         private Texture skinTex; private boolean skinSlim, skinTried;
-        private static final float SLOT = 40, GAP = 4;
+        private static final float SLOT = 40, GAP = 4, TAB_W = 44, TAB_H = 30, TAB_STEP = 48;
         private static final int COLS = 9;
 
         McInventory(VoxelEngine engine) {
             this.engine = engine;
+            List<Items.Stack> blocks = new ArrayList<>(), tools = new ArrayList<>(), combat = new ArrayList<>(), food = new ArrayList<>(), materials = new ArrayList<>();
             for (BlockType b : BlockType.values()) if (b != BlockType.AIR && !b.hiddenFromInventory()) blocks.add(Items.Stack.of(b));
-            for (Items.Item i : Items.ofKind(Items.Kind.TILE, Items.Kind.MATERIAL)) blocks.add(Items.Stack.of(i));
             for (Items.Item i : Items.ofKind(Items.Kind.PICKAXE, Items.Kind.SHOVEL, Items.Kind.AXE)) tools.add(Items.Stack.of(i));
             for (Items.Item i : Items.ofKind(Items.Kind.SWORD, Items.Kind.HELMET, Items.Kind.CHESTPLATE, Items.Kind.LEGGINGS, Items.Kind.BOOTS)) combat.add(Items.Stack.of(i));
             for (Items.Item i : Items.ofKind(Items.Kind.FOOD)) food.add(Items.Stack.of(i));
+            for (Items.Item i : Items.ofKind(Items.Kind.MATERIAL, Items.Kind.TILE)) materials.add(Items.Stack.of(i));
+            palettes.add(blocks); palettes.add(tools); palettes.add(combat); palettes.add(food); palettes.add(materials);
+            tabIcons.add(Items.Stack.of(BlockType.GRASS)); tabIcons.add(Items.Stack.of(Items.byId("iron_pickaxe"))); tabIcons.add(Items.Stack.of(Items.byId("iron_sword")));
+            tabIcons.add(Items.Stack.of(Items.byId("apple"))); tabIcons.add(Items.Stack.of(Items.byId("iron_ingot"))); tabIcons.add(Items.Stack.of(Items.byId("chest")));
         }
 
         private boolean creative() { return Settings.isCreative(); }
-        private List<Items.Stack> palette() { return tab == 0 ? blocks : tab == 1 ? tools : tab == 2 ? combat : food; }
-        private static final int TABS = 4; private static final float TAB_W = 96, TAB_STEP = 100;
-        private int gridRows() { return creative() ? 4 : 3; }
+        private boolean paletteTab() { return creative() && tab < TAB_INVENTORY; }
+        private List<Items.Stack> palette() { return palettes.get(Math.min(tab, palettes.size() - 1)); }
+        private String tabName(int i) { return t("inventory.tab." + new String[]{"blocks", "tools", "combat", "food", "materials", "inventory"}[i]); }
+        private boolean showCraft() { return !creative(); }
+        private int gridRows() { return paletteTab() ? 4 : 3; }
+        private float bookShift() { return book.open ? (RecipeBook.W + 8) / 2f : 0; }
         private float panelW() { return 56 + COLS * (SLOT + GAP) - GAP + 32; }
-        private float panelH() { return 150 + (creative() ? 30 : 0) + gridRows() * (SLOT + GAP) + 16 + SLOT + 24; }
-        private float px() { return (width - panelW()) / 2f; }
+        private float panelH() { return 150 + (creative() ? 36 : 0) + gridRows() * (SLOT + GAP) + 16 + SLOT + 24; }
+        private float px() { return (width - panelW()) / 2f + bookShift(); }
         private float py() { return (height - panelH()) / 2f; }
         private float gridX() { return px() + 16 + 56; }
-        private float gridY() { return py() + 150 + (creative() ? 30 : 0); }
+        private float gridY() { return py() + 150 + (creative() ? 36 : 0); }
         private float hotbarY() { return gridY() + gridRows() * (SLOT + GAP) + 12; }
         private float armorX() { return px() + 16; }
         private float armorY(int i) { return py() + 40 + i * (SLOT + GAP); }
@@ -450,7 +460,7 @@ final class Screens {
         private int perPage() { return gridRows() * COLS; }
 
         void onScroll(double dy) {
-            if (!creative()) return;
+            if (!paletteTab()) return;
             int pages = (palette().size() + perPage() - 1) / perPage();
             page = Math.max(0, Math.min(pages - 1, page - (int) Math.signum(dy)));
         }
@@ -462,19 +472,25 @@ final class Screens {
         @Override public void onTick(long ticks) { int[] s = Mc.windowSize(); width = s[0]; height = s[1]; }
 
         private Items.Stack gridStack(int i) {
-            if (creative()) { int idx = page * perPage() + i; return idx < palette().size() ? palette().get(idx) : null; }
+            if (paletteTab()) { int idx = page * perPage() + i; return idx < palette().size() ? palette().get(idx) : null; }
             return i < BuiltinUI.STORAGE.length ? BuiltinUI.STORAGE[i] : null;
         }
+
+        // RecipeBook.Host (survival 2x2 grid)
+        @Override public int gridSize() { return 2; }
+        @Override public Items.Stack[] grid() { return craft; }
+        @Override public void gridChanged() { recomputeCraft(); }
 
         @Override public void render() {
             GLUIRenderer.setup2DRendering(width, height);
             try {
                 float px = px(), py = py(), pw = panelW(), ph = panelH();
                 GLUIRenderer.drawPanel(0, 0, width, height, 0, 0, 0, 0.6f);
+                float[] mouse = Mc.mouse();
+                if (showCraft()) { book.layout(px, py, ph); book.render(mouse); }
                 Mc.window(px, py, pw, ph);
                 float[] d = Mc.TEXT_DARK;
                 GLUIRenderer.drawText(t(creative() ? "inventory.creative" : "inventory.title"), px + 16, py + 26, d[0], d[1], d[2], 1f);
-                float[] mouse = Mc.mouse();
                 // armor slots
                 for (int i = 0; i < 4; i++) {
                     float sx = armorX(), sy = armorY(i);
@@ -492,8 +508,8 @@ final class Screens {
                 GLUIRenderer.drawText(t("inventory.mode", GameMode.label()), ix, cy + 18, d[0], d[1], d[2], 1f);
                 GLUIRenderer.drawText(t(creative() ? "inventory.hint.creative" : "inventory.hint.survival"), ix, cy + 42, d[0], d[1], d[2], 1f);
                 GLUIRenderer.drawText(t("inventory.hint.clear"), ix, cy + 66, d[0], d[1], d[2], 1f);
-                if (!creative()) {
-                    GLUIRenderer.drawText(Lang.t("tip.armor", Survival.armorPoints()) + "   " + Lang.t("tip.food", Math.round(Survival.hunger)), ix, cy + 90, d[0], d[1], d[2], 1f);
+                if (!creative()) GLUIRenderer.drawText(Lang.t("tip.armor", Survival.armorPoints()) + "   " + Lang.t("tip.food", Math.round(Survival.hunger)), ix, cy + 90, d[0], d[1], d[2], 1f);
+                if (showCraft()) {
                     GLUIRenderer.drawText(t("container.crafting"), craftX(), craftY() - 8, d[0], d[1], d[2], 1f);
                     for (int i = 0; i < 4; i++) {
                         float sx = craftX() + (i % 2) * (SLOT + GAP), sy = craftY() + (i / 2) * (SLOT + GAP);
@@ -505,17 +521,24 @@ final class Screens {
                     Mc.slot(rx, ry, SLOT, GLUIRenderer.isPointInRect(mouse[0], mouse[1], rx, ry, SLOT, SLOT));
                     GLUIRenderer.drawBorder(rx, ry, SLOT, SLOT, 2, 0.95f, 0.8f, 0.3f, 1);
                     if (craftResult != null) craftResult.drawIcon(rx + SLOT / 2, ry + SLOT / 2, SLOT * 0.62f);
+                    RecipeBook.drawToggle(bookX(), bookY(), mouse);
                 }
-                // creative tabs
+                // creative tabs (icons like Minecraft)
+                int hoverTab = -1;
                 if (creative()) {
-                    String[] names = {t("inventory.tab.blocks"), t("inventory.tab.tools"), t("inventory.tab.combat"), t("inventory.tab.food")};
                     for (int i = 0; i < TABS; i++) {
                         float tx = gridX() + i * TAB_STEP, ty = tabY();
-                        boolean hover = GLUIRenderer.isPointInRect(mouse[0], mouse[1], tx, ty, TAB_W, 26);
-                        Mc.button(tx, ty, TAB_W, 26, names[i], hover, tab != i);
+                        boolean hover = GLUIRenderer.isPointInRect(mouse[0], mouse[1], tx, ty, TAB_W, TAB_H), sel = tab == i;
+                        if (hover) hoverTab = i;
+                        GLUIRenderer.drawPanel(tx, ty, TAB_W, TAB_H + (sel ? 4 : 0), 0, 0, 0, 1);
+                        float g = sel ? 0.78f : hover ? 0.6f : 0.47f;
+                        GLUIRenderer.drawPanel(tx + 1, ty + 1, TAB_W - 2, TAB_H - 2 + (sel ? 6 : 0), g, g, g, 1);
+                        tabIcons.get(i).drawIcon(tx + TAB_W / 2, ty + TAB_H / 2 + 1, 20);
                     }
-                    int pages = (palette().size() + perPage() - 1) / perPage();
-                    if (pages > 1) GLUIRenderer.drawText((page + 1) + "/" + pages, gridX() + TABS * TAB_STEP + 4, tabY() + 19, d[0], d[1], d[2], 1f);
+                    if (paletteTab()) {
+                        int pages = (palette().size() + perPage() - 1) / perPage();
+                        if (pages > 1) GLUIRenderer.drawText((page + 1) + "/" + pages, gridX() + TABS * TAB_STEP + 6, tabY() + 21, d[0], d[1], d[2], 1f);
+                    }
                 }
                 // grid
                 for (int i = 0; i < perPage(); i++) {
@@ -531,11 +554,21 @@ final class Screens {
                     if (BuiltinUI.HOTBAR[i] != null) BuiltinUI.HOTBAR[i].drawIcon(sx + SLOT / 2, sy + SLOT / 2, SLOT * 0.62f);
                 }
                 if (carried != null) carried.drawIcon(mouse[0], mouse[1], SLOT * 0.62f);
+                else if (hoverTab >= 0) label(tabName(hoverTab), mouse[0], mouse[1]);
                 else {
                     Items.Stack hover = hovered(mouse[0], mouse[1]);
                     if (hover != null) tooltip(hover, mouse[0], mouse[1]);
+                    else if (showCraft() && RecipeBook.toggleHit(bookX(), bookY(), mouse[0], mouse[1])) label(t("recipes.open"), mouse[0], mouse[1]);
                 }
             } finally { GLUIRenderer.restore3DRendering(); }
+        }
+
+        private void label(String text, float mx, float my) {
+            float tw = GLUIRenderer.getTextWidth(text) + 10, th = 24;
+            float x = Math.min(mx + 12, width - tw - 4), y = my - th - 4;
+            GLUIRenderer.drawPanel(x, y, tw, th, 0.06f, 0.0f, 0.06f, 0.92f);
+            GLUIRenderer.drawBorder(x, y, tw, th, 1, 0.3f, 0.1f, 0.5f, 1);
+            Mc.text(text, x + 5, y + 17, Mc.TEXT);
         }
 
         private void tooltip(Items.Stack s, float mx, float my) {
@@ -552,8 +585,10 @@ final class Screens {
         private float craftY() { return py() + 52; }
         private float resultX() { return craftX() + 2 * (SLOT + GAP) + 46; }
         private float resultY() { return craftY() + (SLOT + GAP) / 2; }
+        private float bookX() { return craftX() - 40; }
+        private float bookY() { return craftY() + (SLOT + GAP) / 2 + 8; }
         private int craftHit(float mx, float my) {
-            if (creative()) return -1;
+            if (!showCraft()) return -1;
             for (int i = 0; i < 4; i++) if (GLUIRenderer.isPointInRect(mx, my, craftX() + (i % 2) * (SLOT + GAP), craftY() + (i / 2) * (SLOT + GAP), SLOT, SLOT)) return i;
             if (GLUIRenderer.isPointInRect(mx, my, resultX(), resultY(), SLOT, SLOT)) return 4;
             return -1;
@@ -575,7 +610,7 @@ final class Screens {
         }
         private int tabHit(float mx, float my) {
             if (!creative()) return -1;
-            for (int i = 0; i < TABS; i++) if (GLUIRenderer.isPointInRect(mx, my, gridX() + i * TAB_STEP, tabY(), TAB_W, 26)) return i;
+            for (int i = 0; i < TABS; i++) if (GLUIRenderer.isPointInRect(mx, my, gridX() + i * TAB_STEP, tabY(), TAB_W, TAB_H)) return i;
             return -1;
         }
         private Items.Stack hovered(float mx, float my) {
@@ -583,6 +618,8 @@ final class Screens {
             if (g >= 0) return gridStack(g);
             int h = hotbarHit(mx, my);
             if (h >= 0) return BuiltinUI.HOTBAR[h];
+            int c = craftHit(mx, my);
+            if (c >= 0) return c == 4 ? craftResult : craft[c];
             int a = armorHit(mx, my);
             return a >= 0 ? Survival.ARMOR[a] : null;
         }
@@ -592,16 +629,34 @@ final class Screens {
             return GLFW.glfwGetKey(w, GLFW.GLFW_KEY_LEFT_SHIFT) == GLFW.GLFW_PRESS || GLFW.glfwGetKey(w, GLFW.GLFW_KEY_RIGHT_SHIFT) == GLFW.GLFW_PRESS;
         }
 
-        /** Shift-click: armor goes to its slot, otherwise to the first free hotbar slot (or storage in survival). */
+        /** Shift-click: armor goes to its slot, otherwise to the first free hotbar slot (or storage). */
         private boolean quickMove(Items.Stack s) {
             if (s == null) return false;
             if (s.item != null && s.item.isArmor() && Survival.ARMOR[s.item.armorSlot()] == null) { Survival.ARMOR[s.item.armorSlot()] = s; return true; }
             for (int i = 0; i < 9; i++) if (BuiltinUI.HOTBAR[i] == null) { BuiltinUI.HOTBAR[i] = s; return true; }
-            if (!creative()) for (int i = 0; i < BuiltinUI.STORAGE.length; i++) if (BuiltinUI.STORAGE[i] == null) { BuiltinUI.STORAGE[i] = s; return true; }
+            for (int i = 0; i < BuiltinUI.STORAGE.length; i++) if (BuiltinUI.STORAGE[i] == null) { BuiltinUI.STORAGE[i] = s; return true; }
             return false;
         }
 
+        /** Right click on a normal slot: pick up half / drop one, like Minecraft. */
+        private void rightClick(Items.Stack[] arr, int i) {
+            Items.Stack s = arr[i];
+            if (carried == null && s != null) { int half = (s.count + 1) / 2; carried = Containers.ContainerScreen.copy(s); carried.count = half; s.count -= half; if (s.count <= 0) arr[i] = null; }
+            else if (carried != null && (s == null || (s.same(carried) && s.count < 64))) { if (s == null) { arr[i] = Containers.ContainerScreen.copy(carried); arr[i].count = 1; } else s.count++; if (--carried.count <= 0) carried = null; }
+        }
+
+        /** Left click on a normal slot: swap, merge or pick up. */
+        private void leftClick(Items.Stack[] arr, int i) {
+            Items.Stack s = arr[i];
+            if (carried != null && s != null && s.same(carried)) { int move = Math.min(64 - s.count, carried.count); s.count += move; carried.count -= move; if (carried.count <= 0) carried = null; }
+            else { arr[i] = carried; carried = s; }
+        }
+
         @Override public void onMouseClick(int mx, int my, int button) {
+            if (showCraft()) {
+                if (book.click(mx, my, button)) return;
+                if (RecipeBook.toggleHit(bookX(), bookY(), mx, my)) { book.open = !book.open; BuiltinUI.sound().play("click"); return; }
+            }
             int tabIdx = tabHit(mx, my);
             if (tabIdx >= 0) { tab = tabIdx; page = 0; return; }
             int g = gridHit(mx, my), h = hotbarHit(mx, my), a = armorHit(mx, my), c = craftHit(mx, my);
@@ -616,13 +671,9 @@ final class Screens {
                 return;
             }
             if (c >= 0) {
-                Items.Stack cur = craft[c];
-                if (button == 1) { if (carried != null && (cur == null || (cur.same(carried) && cur.count < 64))) { if (cur == null) { craft[c] = Containers.ContainerScreen.copy(carried); craft[c].count = 1; } else cur.count++; if (--carried.count <= 0) carried = null; } }
-                else if (shift && cur != null) { if (Mining.give(cur)) craft[c] = null; }
-                else if (carried == null) { carried = cur; craft[c] = null; }
-                else if (cur == null) { craft[c] = carried; carried = null; }
-                else if (cur.same(carried)) { int move = Math.min(64 - cur.count, carried.count); cur.count += move; carried.count -= move; if (carried.count <= 0) carried = null; }
-                else { craft[c] = carried; carried = cur; }
+                if (button == 1) rightClick(craft, c);
+                else if (shift && craft[c] != null) { if (Mining.give(craft[c])) craft[c] = null; }
+                else leftClick(craft, c);
                 recomputeCraft();
                 return;
             }
@@ -634,25 +685,28 @@ final class Screens {
             }
             if (g >= 0) {
                 Items.Stack s = gridStack(g);
-                if (creative()) {
+                if (paletteTab()) {
                     if (shift && s != null) quickMove(s.fresh());
                     else carried = button == 1 || carried != null ? null : (s == null ? null : s.fresh());
-                } else if (button == 1) BuiltinUI.STORAGE[g] = null;
+                } else if (button == 1 && creative() && carried == null) BuiltinUI.STORAGE[g] = null;
+                else if (button == 1) rightClick(BuiltinUI.STORAGE, g);
                 else if (shift && s != null) { if (quickMoveFromStorage(g)) return; }
-                else { BuiltinUI.STORAGE[g] = carried; carried = s; }
+                else leftClick(BuiltinUI.STORAGE, g);
             } else if (h >= 0) {
-                if (button == 1) BuiltinUI.HOTBAR[h] = null;
+                if (button == 1 && creative() && carried == null) BuiltinUI.HOTBAR[h] = null;
+                else if (button == 1) rightClick(BuiltinUI.HOTBAR, h);
                 else if (shift && BuiltinUI.HOTBAR[h] != null) {
                     Items.Stack s = BuiltinUI.HOTBAR[h];
                     if (s.item != null && s.item.isArmor() && Survival.ARMOR[s.item.armorSlot()] == null) { Survival.ARMOR[s.item.armorSlot()] = s; BuiltinUI.HOTBAR[h] = null; }
-                    else if (creative()) BuiltinUI.HOTBAR[h] = null;
+                    else if (paletteTab()) BuiltinUI.HOTBAR[h] = null;
                     else for (int i = 0; i < BuiltinUI.STORAGE.length; i++) if (BuiltinUI.STORAGE[i] == null) { BuiltinUI.STORAGE[i] = s; BuiltinUI.HOTBAR[h] = null; break; }
-                } else { Items.Stack t = BuiltinUI.HOTBAR[h]; BuiltinUI.HOTBAR[h] = carried; carried = creative() && carried != null ? null : t; }
+                } else if (paletteTab() && carried != null) { BuiltinUI.HOTBAR[h] = carried; carried = null; }
+                else leftClick(BuiltinUI.HOTBAR, h);
                 BuiltinUI.select(engine, BuiltinUI.selected);
             } else if (a >= 0) {
                 if (button == 1) Survival.ARMOR[a] = null;
                 else if (carried == null) { Items.Stack t = Survival.ARMOR[a]; Survival.ARMOR[a] = null; if (!shift || !quickMove(t)) carried = t; }
-                else if (carried.item != null && carried.item.armorSlot() == a) { Items.Stack t = Survival.ARMOR[a]; Survival.ARMOR[a] = carried; carried = creative() ? null : t; }
+                else if (carried.item != null && carried.item.armorSlot() == a) { Items.Stack t = Survival.ARMOR[a]; Survival.ARMOR[a] = carried; carried = paletteTab() ? null : t; }
             } else if (carried != null && button == 0) carried = null;
         }
 
@@ -671,8 +725,8 @@ final class Screens {
                 if (s != null) {
                     Drops.throwFromPlayer(engine, s);
                     if (carried == s) carried = null;
-                    else { int gi = gridHit(m[0], m[1]), hi = hotbarHit(m[0], m[1]), ai = armorHit(m[0], m[1]);
-                        if (hi >= 0) BuiltinUI.HOTBAR[hi] = null; else if (ai >= 0) Survival.ARMOR[ai] = null; else if (gi >= 0 && !creative()) BuiltinUI.STORAGE[gi] = null; }
+                    else { int gi = gridHit(m[0], m[1]), hi = hotbarHit(m[0], m[1]), ai = armorHit(m[0], m[1]), ci = craftHit(m[0], m[1]);
+                        if (hi >= 0) BuiltinUI.HOTBAR[hi] = null; else if (ai >= 0) Survival.ARMOR[ai] = null; else if (gi >= 0 && !paletteTab()) BuiltinUI.STORAGE[gi] = null; else if (ci >= 0 && ci < 4) { craft[ci] = null; recomputeCraft(); } }
                     BuiltinUI.select(engine, BuiltinUI.selected);
                 }
                 return;
@@ -680,7 +734,7 @@ final class Screens {
             if (key >= GLFW.GLFW_KEY_1 && key <= GLFW.GLFW_KEY_9 && carried != null) {
                 int i = key - GLFW.GLFW_KEY_1;
                 BuiltinUI.HOTBAR[i] = carried;
-                if (!creative()) carried = null;
+                if (!paletteTab()) carried = null;
                 BuiltinUI.select(engine, BuiltinUI.selected);
             }
         }

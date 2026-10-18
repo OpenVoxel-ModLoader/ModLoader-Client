@@ -30,7 +30,7 @@ final class Tiles {
     private Tiles() {}
 
     enum Type {
-        CRAFTING_TABLE("crafting_table", BlockType.OAK_LOG, 1f), CHEST("chest", BlockType.OAK_LOG, 0.875f), BED("bed", BlockType.SLAB, 0.5f);
+        OAK_PLANKS("oak_planks", BlockType.OAK_LOG, 1f), CRAFTING_TABLE("crafting_table", BlockType.OAK_LOG, 1f), CHEST("chest", BlockType.OAK_LOG, 0.875f), BED("bed", BlockType.SLAB, 0.5f);
         final String item; final BlockType base; final float height;
         Type(String item, BlockType base, float height) { this.item = item; this.base = base; this.height = height; }
         static Type of(Items.Item item) { if (item == null) return null; for (Type t : values()) if (t.item.equals(item.id)) return t; return null; }
@@ -183,15 +183,21 @@ final class Tiles {
     private static final String[] TABLE_TOP = {
         "LLLLLLLLLLLLLLLL", "LAAAAAAALAAAAAAL", "LAaaaaaALAaaaaAL", "LAaAAAaALAaAAaAL", "LAaaaaaALAaaaaAL", "LAAAAAAALAAAAAAL", "LLLLLLLLLLLLLLLL", "LAAAAAAALAAAAAAL",
         "LAaaaaaALAaaaaAL", "LAaAAAaALAaAAaAL", "LAaaaaaALAaaaaAL", "LAAAAAAALAAAAAAL", "LLLLLLLLLLLLLLLL", "LAAAAAAALAAAAAAL", "LAaaaaaALAaaaaAL", "LLLLLLLLLLLLLLLL"};
+    private static final String[] PLANKS_BLOCK = {
+        "hhhhhhhhhhhhhhhh", "hAAAAAAAAAAAAAAh", "hAaaaaaaaaaaaaAh", "hAAAAAAAAAAAAAAh", "hhhhhhhhhhhhhhhh", "hAAAAAAAAAAAAAAh", "hAaaaaaaaaaaaaAh", "hAAAAAAAAAAAAAAh",
+        "hhhhhhhhhhhhhhhh", "hAAAAAAAAAAAAAAh", "hAaaaaaaaaaaaaAh", "hAAAAAAAAAAAAAAh", "hhhhhhhhhhhhhhhh", "hAAAAAAAAAAAAAAh", "hAaaaaaaaaaaaaAh", "hhhhhhhhhhhhhhhh"};
     private static final String[] TABLE_SIDE = {
         "LLLLLLLLLLLLLLLL", "AAAAAAAAAAAAAAAA", "aaaaaaaaaaaaaaaa", "HHHHHHHHHHHHHHHH", "HhGGGhHHhhGGGhhH", "HhGhGhHHhhGhGhhH", "HhGGGhHHhhGGGhhH", "HhhhhhHHhhhhhhhH",
         "HHHHHHHHHHHHHHHH", "HhhhhhhhhhhhhhhH", "HhhhhhhhhhhhhhhH", "HHHHHHHHHHHHHHHH", "HH............HH", "HH............HH", "HH............HH", "HH............HH"};
     private static final String[] CHEST_SIDE = {
-        "HHHHHHHHHHHHHHHH", "HhhhhhhhhhhhhhhH", "HhhhhhhhhhhhhhhH", "HhhhhhhhhhhhhhhH", "HHHHHHHHHHHHHHHH", "HhhhhhhhhhhhhhhH", "HhhhhhhhhhhhhhhH", "HhhhhhhhhhhhhhhH",
-        "HhhhhhhhhhhhhhhH", "HhhhhhhhhhhhhhhH", "HhhhhhhhhhhhhhhH", "HhhhhhhhhhhhhhhH", "HhhhhhhhhhhhhhhH", "HhhhhhhhhhhhhhhH", "HhhhhhhhhhhhhhhH", "HHHHHHHHHHHHHHHH"};
+        "hhhhhhhhhhhhhhhh", "hAAAAAAAAAAAAAAh", "hAAAAAAAAAAAAAAh", "hAAAAAAAAAAAAAAh", "hAaAAAAAAAAAAaAh", "hhhhhhhhhhhhhhhh", "hAAAAAAAAAAAAAAh", "hAAAAAAAAAAAAAAh",
+        "hAaAAAAAAAAAAaAh", "hAAAAAAAAAAAAAAh", "hAAAAAAAAAAAAAAh", "hAaAAAAAAAAAAaAh", "hAAAAAAAAAAAAAAh", "hAAAAAAAAAAAAAAh", "hAAAAAAAAAAAAAAh", "hhhhhhhhhhhhhhhh"};
     private static final String[] CHEST_FRONT = {
-        "HHHHHHHHHHHHHHHH", "HhhhhhhhhhhhhhhH", "HhhhhhhhhhhhhhhH", "HhhhhhhGGhhhhhhH", "HHHHHHHGGHHHHHHH", "HhhhhhhGGhhhhhhH", "HhhhhhhhhhhhhhhH", "HhhhhhhhhhhhhhhH",
-        "HhhhhhhhhhhhhhhH", "HhhhhhhhhhhhhhhH", "HhhhhhhhhhhhhhhH", "HhhhhhhhhhhhhhhH", "HhhhhhhhhhhhhhhH", "HhhhhhhhhhhhhhhH", "HhhhhhhhhhhhhhhH", "HHHHHHHHHHHHHHHH"};
+        "hhhhhhhhhhhhhhhh", "hAAAAAAAAAAAAAAh", "hAAAAAAAAAAAAAAh", "hAAAAAAGGAAAAAAh", "hAaAAAAGGAAAAaAh", "hhhhhhhGGhhhhhhh", "hAAAAAAGGAAAAAAh", "hAAAAAAAaAAAAAAh",
+        "hAaAAAAAAAAAAaAh", "hAAAAAAAAAAAAAAh", "hAAAAAAAAAAAAAAh", "hAaAAAAAAAAAAaAh", "hAAAAAAAAAAAAAAh", "hAAAAAAAAAAAAAAh", "hAAAAAAAAAAAAAAh", "hhhhhhhhhhhhhhhh"};
+    private static final String[] CHEST_TOP = {
+        "hhhhhhhhhhhhhhhh", "hAAAAAAAAAAAAAAh", "hAaaaaaaaaaaaaAh", "hAaAAAAAAAAAAaAh", "hAaAAAAAAAAAAaAh", "hAaAAAAAAAAAAaAh", "hAaAAAAAAAAAAaAh", "hAaAAAAGGAAAAaAh",
+        "hAaAAAAGGAAAAaAh", "hAaAAAAAAAAAAaAh", "hAaAAAAAAAAAAaAh", "hAaAAAAAAAAAAaAh", "hAaAAAAAAAAAAaAh", "hAaaaaaaaaaaaaAh", "hAAAAAAAAAAAAAAh", "hhhhhhhhhhhhhhhh"};
     private static final String[] BED_TOP = {
         "WWWWWWWWWWWWWWWW", "WLLLLLWAAAAAAAAW", "WLLLLLWAAAAAAAAW", "WLLLLLWAAAAAAAAW", "WLLLLLWAaaaaaaAW", "WLLLLLWAaAAAAaAW", "WLLLLLWAaAAAAaAW", "WLLLLLWAaAAAAaAW",
         "WLLLLLWAaAAAAaAW", "WLLLLLWAaAAAAaAW", "WLLLLLWAaAAAAaAW", "WLLLLLWAaaaaaaAW", "WLLLLLWAAAAAAAAW", "WLLLLLWAAAAAAAAW", "WLLLLLWAAAAAAAAW", "WWWWWWWWWWWWWWWW"};
@@ -222,11 +228,12 @@ final class Tiles {
             GL11.glPushMatrix();
             GL11.glTranslatef((float) rx, (float) ry, (float) rz);
             switch (t.type) {
+                case OAK_PLANKS: box(tex("oak_planks", PLANKS_BLOCK, wood()), tex("oak_planks", PLANKS_BLOCK, wood()), tex("oak_planks", PLANKS_BLOCK, wood()), -0.005f, 1.01f, 1.01f, bright); break;
                 case CRAFTING_TABLE: box(tex("table_top", TABLE_TOP, wood()), tex("table_side", TABLE_SIDE, wood()), tex("table_side", TABLE_SIDE, wood()), -0.005f, 1.01f, 1.01f, bright); break;
                 case CHEST: {
                     Texture side = tex("chest_side", CHEST_SIDE, wood()), front = tex("chest_front", CHEST_FRONT, wood());
                     GL11.glTranslatef(0.5f, 0, 0.5f); GL11.glRotatef(t.facing * 90f, 0, 1, 0); GL11.glTranslatef(-0.5f, 0, -0.5f);
-                    box(side, side, front, 0.0625f, 0.875f, 1.01f, bright);
+                    box(tex("chest_top", CHEST_TOP, wood()), side, front, -0.005f, 1.0f, 1.01f, bright);
                     break;
                 }
                 case BED: {

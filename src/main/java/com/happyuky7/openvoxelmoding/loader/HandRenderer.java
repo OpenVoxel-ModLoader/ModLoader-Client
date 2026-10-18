@@ -78,11 +78,11 @@ final class HandRenderer {
     }
 
     private static void renderDrops(Renderer renderer, VoxelEngine e, Camera cam) {
-        if (Drops.count() == 0 && Tiles.all().isEmpty()) return;
+        if (Drops.count() == 0 && Tiles.all().isEmpty() && Mobs.count() == 0) return;
         GlState state = new GlState();
         loadMatrices(cam, true);
         state.save();
-        try { Tiles.render(renderer, e, cam); Drops.render(renderer, e, cam); }
+        try { Tiles.render(renderer, e, cam); Drops.render(renderer, e, cam); Mobs.render(renderer, e, cam); }
         finally { state.restore(); popMatrices(); }
     }
 
@@ -281,16 +281,25 @@ final class HandRenderer {
         GL11.glEnd();
     }
 
+    /** tx, ty, tz, rotZ, rotX, rotY, scale of the first-person arm. */
+    private static final float[] ARM = {0.40f, -0.30f, -0.70f, -135f, -25f, 0f, 0.7f};
+
     private static void drawArm(float bright) {
         Texture skin = Skins.handTexture();
         if (skin == null) return;
         boolean slim = Skins.handSlim();
         float texW = Skins.handTexWidth(), scale = texW / 64f;
         float half = slim ? 1.5f : 2f;
-        GL11.glTranslatef(0.58f, -0.40f, -0.95f);
-        GL11.glRotatef(32f, 0, 0, 1);
-        GL11.glRotatef(35f, 0, 1, 0);
-        GL11.glRotatef(22f, 1, 0, 0);
+        // Minecraft pose: the hand sits at the lower right, the arm leaves the view down, right and away.
+        float[] a = ARM;
+        String dbg = System.getProperty("ml.arm");
+        if (dbg != null) try { String[] p = dbg.split(","); a = new float[p.length]; for (int i = 0; i < p.length; i++) a[i] = Float.parseFloat(p[i].trim()); } catch (Exception ignored) { a = ARM; }
+        GL11.glTranslatef(a[0], a[1], a[2]);
+        GL11.glRotatef(a[3], 0, 0, 1);
+        GL11.glRotatef(a[4], 1, 0, 0);
+        GL11.glRotatef(a[5], 0, 1, 0);
+        GL11.glScalef(a[6], a[6], a[6]);
+        GL11.glTranslatef(0f, 0.75f, 0f);        // pivot at the hand (box spans y -12..0, shoulder at 0)
         skin.bind();
         drawBox(-half, -12, -2, half, 0, 2, 40 * scale, 16 * scale, 0f, scale, texW, texW, bright);
         drawBox(-half, -12, -2, half, 0, 2, 40 * scale, 32 * scale, 0.25f, scale, texW, texW, bright);

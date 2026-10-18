@@ -30,20 +30,21 @@ final class Recipes {
     }
 
     static {
-        Items.Stack log = b(BlockType.OAK_LOG), stone = b(BlockType.STONE), stick = i("stick");
-        add(Items.Stack.of(Items.byId("stick"), 4), new String[]{"L"}, 'L', log);
-        add(Items.Stack.of(Items.byId("crafting_table")), new String[]{"LL", "LL"}, 'L', log);
-        add(Items.Stack.of(Items.byId("chest")), new String[]{"LLL", "L L", "LLL"}, 'L', log);
-        add(Items.Stack.of(Items.byId("bed")), new String[]{"FFF", "LLL"}, 'F', b(BlockType.OAK_LEAVES), 'L', log);
+        Items.Stack log = b(BlockType.OAK_LOG), planks = i("oak_planks"), stone = b(BlockType.STONE), stick = i("stick");
+        add(Items.Stack.of(Items.byId("oak_planks"), 4), new String[]{"L"}, 'L', log);
+        add(Items.Stack.of(Items.byId("stick"), 4), new String[]{"P", "P"}, 'P', planks);
+        add(Items.Stack.of(Items.byId("crafting_table")), new String[]{"PP", "PP"}, 'P', planks);
+        add(Items.Stack.of(Items.byId("chest")), new String[]{"PPP", "P P", "PPP"}, 'P', planks);
+        add(Items.Stack.of(Items.byId("bed")), new String[]{"FFF", "PPP"}, 'F', b(BlockType.OAK_LEAVES), 'P', planks);
         add(Items.Stack.of(BlockType.TORCH, 4), new String[]{"C", "S"}, 'C', i("coal"), 'S', stick);
         add(Items.Stack.of(BlockType.SLAB, 6), new String[]{"SSS"}, 'S', stone);
         add(Items.Stack.of(BlockType.STAIR, 4), new String[]{"S  ", "SS ", "SSS"}, 'S', stone);
-        add(Items.Stack.of(BlockType.DOOR, 3), new String[]{"LL", "LL", "LL"}, 'L', log);
+        add(Items.Stack.of(BlockType.DOOR, 3), new String[]{"PP", "PP", "PP"}, 'P', planks);
         add(Items.Stack.of(BlockType.GLASS, 1), new String[]{"S", "C"}, 'S', b(BlockType.SAND), 'C', i("coal"));
         add(Items.Stack.of(Items.byId("golden_apple")), new String[]{"GGG", "GAG", "GGG"}, 'G', i("gold_ingot"), 'A', i("apple"));
         add(Items.Stack.of(Items.byId("bread")), new String[]{"PPP"}, 'P', b(BlockType.PUMPKIN));
         String[] tiers = {"wooden", "stone", "iron", "golden", "diamond"};
-        Items.Stack[] mats = {log, stone, i("iron_ingot"), i("gold_ingot"), i("diamond")};
+        Items.Stack[] mats = {planks, stone, i("iron_ingot"), i("gold_ingot"), i("diamond")};
         for (int t = 0; t < tiers.length; t++) {
             Items.Stack m = mats[t];
             add(i(tiers[t] + "_sword"), new String[]{"M", "M", "S"}, 'M', m, 'S', stick);

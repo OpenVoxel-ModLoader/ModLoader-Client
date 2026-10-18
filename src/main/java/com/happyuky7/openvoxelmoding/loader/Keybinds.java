@@ -13,7 +13,7 @@ import java.util.Map;
 final class Keybinds {
     private Keybinds() {}
 
-    static final String[] ACTIONS = {"forward", "back", "left", "right", "jump", "sneak", "sprint", "inventory", "chat", "drop", "debug", "thirdperson"};
+    static final String[] ACTIONS = {"forward", "back", "left", "right", "jump", "sneak", "sprint", "inventory", "chat", "drop", "debug", "thirdperson", "playerlist"};
     private static final Map<String, Integer> DEFAULTS = new LinkedHashMap<>();
     private static final Map<String, Integer> BOUND = new LinkedHashMap<>();
     /** Engine key code → action, so remapping works inside the game's own input code. */
@@ -25,7 +25,7 @@ final class Keybinds {
         DEFAULTS.put("jump", GLFW.GLFW_KEY_SPACE); DEFAULTS.put("sneak", GLFW.GLFW_KEY_LEFT_SHIFT);
         DEFAULTS.put("sprint", GLFW.GLFW_KEY_LEFT_CONTROL); DEFAULTS.put("inventory", GLFW.GLFW_KEY_E);
         DEFAULTS.put("chat", GLFW.GLFW_KEY_T); DEFAULTS.put("drop", GLFW.GLFW_KEY_Q);
-        DEFAULTS.put("debug", GLFW.GLFW_KEY_F3); DEFAULTS.put("thirdperson", GLFW.GLFW_KEY_F5);
+        DEFAULTS.put("debug", GLFW.GLFW_KEY_F3); DEFAULTS.put("thirdperson", GLFW.GLFW_KEY_F5); DEFAULTS.put("playerlist", GLFW.GLFW_KEY_TAB);
         BOUND.putAll(DEFAULTS);
         // What the engine's InputHandler polls for each action.
         ENGINE.put(GLFW.GLFW_KEY_W, "forward"); ENGINE.put(GLFW.GLFW_KEY_S, "back");

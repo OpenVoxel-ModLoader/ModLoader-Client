@@ -94,7 +94,7 @@ final class Mining {
         long window = UIManager.get().getWindow();
         boolean left = !UIManager.get().hasActiveGUIs() && GLFW.glfwGetMouseButton(window, 0) == GLFW.GLFW_PRESS;
         InputHandler.Hit hit = e.getCamera().getInputHandler().getHoverHit();
-        if (!left || hit == null) { progress = 0; hadTarget = false; return; }
+        if (!left || hit == null || Mobs.suppressBlockClick()) { progress = 0; hadTarget = false; return; }
         if (!hadTarget || hit.x != tx || hit.y != ty || hit.z != tz) { tx = hit.x; ty = hit.y; tz = hit.z; progress = 0; hadTarget = true; }
         BlockType type;
         try { type = BlockType.fromId(BlockState.typeId(e.getWorld().getState(tx, ty, tz))); } catch (Exception error) { return; }
