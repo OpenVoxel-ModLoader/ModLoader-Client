@@ -42,6 +42,7 @@ final class Mining {
         h(BlockType.OAK_LEAVES, 0.2f, 0, false); h(BlockType.GLASS, 0.3f, 0, false);
         h(BlockType.TORCH, 0f, 0, false); h(BlockType.FLOWER, 0f, 0, false); h(BlockType.TALLGRASS, 0f, 0, false);
         h(BlockType.BEDROCK, -1f, 1, true);
+        for (NativeBlocks.Def d : NativeBlocks.all()) if (d.blockType() != null) h((BlockType) d.blockType(), d.hardness, d.tool, d.requiresTool);
     }
 
     private static int toolOf(Items.Stack s) {

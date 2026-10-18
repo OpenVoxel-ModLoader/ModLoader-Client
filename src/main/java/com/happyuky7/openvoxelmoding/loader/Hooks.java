@@ -153,6 +153,11 @@ public final class Hooks {
 
     /** Resource-pack override: {@code client/instance/resourcepacks/<pack>/<filepath>}. */
     public static void textureDecode(Object texture) {
+        byte[] nativePng = NativeBlocks.pngOf(texture);
+        if (nativePng != null) {
+            try { handle("net.openvoxel.engine.rendering.Texture", "decodeFromBytes", false, void.class, byte[].class).invoke(texture, nativePng); return; }
+            catch (Throwable t) { throw rethrow(t); }
+        }
         try {
             if (!Settings.resourcePack.isEmpty()) {
                 if (textureFilepath == null) { textureFilepath = Texture.class.getDeclaredField("filepath"); textureFilepath.setAccessible(true); }

@@ -31,7 +31,13 @@ public final class Agent {
         return instance;
     }
 
+    /** True when the agent runs inside the dedicated server (native blocks only, no client hooks). */
+    static boolean serverMode;
+
     public static void premain(String arguments, Instrumentation instrumentation) {
+        String command = System.getProperty("sun.java.command", "");
+        serverMode = "server".equalsIgnoreCase(arguments) || command.contains("openvoxel-server") || command.contains("net.openvoxel.server");
+        if (serverMode) { premainServer(instrumentation); return; }
         // Must be registered before any game class loads: the wrappers rename methods in memory only.
         instrumentation.addTransformer(new Transformer(), false);
         Path game = Paths.get(System.getProperty("user.dir")).toAbsolutePath().normalize();
@@ -65,6 +71,24 @@ public final class Agent {
         }, "ModLoader-Shutdown"));
     }
 
+    /**
+     * Dedicated server: registers only the BlockType extension and loads mod jars from {@code mods/}
+     * (or OPENVOXEL_MODS_DIR) so they can declare their native blocks in onLoad. Jars without
+     * {@code openvoxel.mod.properties} (server plugins) are skipped silently.
+     */
+    private static void premainServer(Instrumentation instrumentation) {
+        Transformer.serverMode = true;
+        instrumentation.addTransformer(new Transformer(), false);
+        String configured = System.getenv("OPENVOXEL_MODS_DIR");
+        instance = configured != null ? Paths.get(configured) : Paths.get("").toAbsolutePath();
+        Path mods = configured != null ? instance.resolve("mods") : Paths.get("mods").toAbsolutePath();
+        context = new ModContext(Paths.get("").toAbsolutePath());
+        System.out.println("[ModLoader] " + NAME + " " + VERSION + " (server agent) - native blocks from " + mods);
+        try { if (Files.isDirectory(mods)) loadMods(mods, context); }
+        catch (Throwable error) { System.err.println("[ModLoader] Could not scan mods: " + error); }
+        System.out.println("[ModLoader] " + NativeBlocks.all().size() + " native block(s) registered");
+    }
+
     private static void loadMods(Path directory, ModContext context) throws Exception {
         try (DirectoryStream<Path> files = Files.newDirectoryStream(directory, "*.jar")) {
             for (Path file : files) try {
@@ -72,6 +96,7 @@ public final class Agent {
                 try (JarFile jar = new JarFile(file.toFile())) {
                     Properties properties = new Properties();
                     java.util.jar.JarEntry entry = jar.getJarEntry("openvoxel.mod.properties");
+                    if (entry == null && serverMode) continue;                 // a server plugin, not a mod
                     if (entry == null) throw new IllegalArgumentException("missing openvoxel.mod.properties");
                     try (InputStream in = jar.getInputStream(entry)) { properties.load(in); }
                     main = properties.getProperty("main", "").trim();
@@ -102,6 +127,7 @@ public final class Agent {
             while (engine == null) { engine = type.getMethod("getEngine").invoke(null); if (engine == null) Thread.sleep(100); }
             while (type.getMethod("getEventManager").invoke(engine) == null) Thread.sleep(50);
             context.setEngine(engine);
+            context.runDeferred();
             BuiltinUI.install(context, engine);
             for (ClientMod mod : MODS) try { mod.onGameReady(context); }
             catch (Throwable error) { error.printStackTrace(); }

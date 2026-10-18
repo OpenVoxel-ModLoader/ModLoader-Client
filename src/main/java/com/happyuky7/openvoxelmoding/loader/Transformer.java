@@ -55,11 +55,27 @@ final class Transformer implements ClassFileTransformer {
         wrap("net/openvoxel/engine/world/block/BlockPlacement", "canReplaceInto", "(Lnet/openvoxel/engine/world/block/BlockType;Lnet/openvoxel/engine/world/block/BlockType;J)Z", "canReplaceInto");
     }
 
+    static final String BLOCK_TYPE = "net/openvoxel/engine/world/block/BlockType";
+    /** Dedicated server: only the native block registry is installed (no client hooks). */
+    static volatile boolean serverMode;
+
     /** Classes whose GLFW.glfwGetKey calls go through Hooks.glfwGetKey (rebindable controls). */
     private static final Set<String> REDIRECT_KEYS = new HashSet<>(Arrays.asList("net/openvoxel/engine/input/InputHandler"));
 
     @Override
     public byte[] transform(ClassLoader loader, String className, Class<?> redefined, ProtectionDomain domain, byte[] bytes) {
+        if (serverMode) {
+            if (!BLOCK_TYPE.equals(className)) return null;
+            try {
+                ClassNode cn = new ClassNode();
+                new ClassReader(bytes).accept(cn, 0);
+                if (!extendBlockType(cn)) return null;
+                ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+                cn.accept(cw);
+                System.out.println("[ModLoader] BlockType open for native blocks (server)");
+                return cw.toByteArray();
+            } catch (Throwable error) { System.err.println("[ModLoader] BlockType transform failed: " + error); return null; }
+        }
         List<Target> targets = className == null ? null : TARGETS.get(className);
         // Enum constants with bodies (BlockType$1, $2...) override some hooked methods: wrap those overrides too.
         // Their renamed originals override BlockType's, so the hook's virtual call still reaches them.
@@ -75,6 +91,7 @@ final class Transformer implements ClassFileTransformer {
             ClassNode cn = new ClassNode();
             new ClassReader(bytes).accept(cn, 0);
             int done = 0;
+            if (BLOCK_TYPE.equals(className) && extendBlockType(cn)) done++;
             if (redirect) {
                 for (MethodNode m : cn.methods) for (AbstractInsnNode insn : m.instructions.toArray()) {
                     if (insn instanceof MethodInsnNode) {
@@ -105,6 +122,33 @@ final class Transformer implements ClassFileTransformer {
             System.err.println("[ModLoader] Transform failed for " + className + ": " + error);
             return null;
         }
+    }
+
+    /**
+     * Native blocks: BlockType's constructors become package-private (so the generated subclass in the
+     * same package can call them) and the array built by {@code $values()} in the static initializer is
+     * passed through {@link NativeBlocks#extend}, which appends the registered mod blocks. Everything the
+     * engine derives from {@code values()} afterwards (ID_LOOKUP, valueOf, EnumMaps) sees them.
+     */
+    private static boolean extendBlockType(ClassNode cn) {
+        boolean patched = false;
+        for (MethodNode m : cn.methods) {
+            if (m.name.equals("<init>")) m.access &= ~Opcodes.ACC_PRIVATE;
+            if (!m.name.equals("<clinit>")) continue;
+            for (AbstractInsnNode insn : m.instructions.toArray()) {
+                if (insn instanceof MethodInsnNode) {
+                    MethodInsnNode call = (MethodInsnNode) insn;
+                    if (call.getOpcode() == Opcodes.INVOKESTATIC && call.owner.equals(BLOCK_TYPE) && call.name.equals("$values")) {
+                        InsnList extra = new InsnList();
+                        extra.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "com/happyuky7/openvoxelmoding/loader/NativeBlocks", "extend", "([Ljava/lang/Object;)[Ljava/lang/Object;", false));
+                        extra.add(new TypeInsnNode(Opcodes.CHECKCAST, "[L" + BLOCK_TYPE + ";"));
+                        m.instructions.insert(call, extra);
+                        patched = true;
+                    }
+                }
+            }
+        }
+        return patched;
     }
 
     /** Replaces the method body with {@code return Hooks.hook([this,] args...)}. */

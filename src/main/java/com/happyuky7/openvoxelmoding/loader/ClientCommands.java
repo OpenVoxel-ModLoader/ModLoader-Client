@@ -46,6 +46,7 @@ final class ClientCommands {
             Items.Stack stack = null;
             Items.Item item = Items.byId(args[0].toLowerCase());
             if (item != null) stack = Items.Stack.of(item);
+            else if (NativeBlocks.type(args[0].toLowerCase()) != null) stack = Items.Stack.of(NativeBlocks.type(args[0].toLowerCase()));
             else try { stack = Items.Stack.of(net.openvoxel.engine.world.block.BlockType.valueOf(args[0].toUpperCase())); } catch (Exception ignored) { }
             if (stack == null) { ChatHud.addLine("&cUnknown item: " + args[0]); return; }
             if (args.length > 1) try { stack.count = Math.max(1, Math.min(64, Integer.parseInt(args[1]))); } catch (NumberFormatException ignored) { }

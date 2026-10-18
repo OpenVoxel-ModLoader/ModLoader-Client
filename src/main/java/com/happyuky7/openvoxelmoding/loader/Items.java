@@ -68,7 +68,10 @@ final class Items {
         /** A fresh stack of the same kind, full size (used when taking from the creative palette). */
         Stack fresh() { return block != null ? of(block, 64) : of(item, item.defaultCount()); }
         boolean isBlock() { return block != null; }
-        String name() { return block != null ? Lang.t("block." + block.name().toLowerCase(), pretty(block.name())) : item.name(); }
+        String name() {
+            if (block != null) { String n = NativeBlocks.label(block); return n != null ? n : Lang.t("block." + block.name().toLowerCase(), pretty(block.name())); }
+            return item.name();
+        }
         String tooltip() { return item != null ? item.tooltip() : null; }
         boolean same(Stack o) { return o != null && o.block == block && o.item == item; }
         void drawIcon(float cx, float cy, float size) {

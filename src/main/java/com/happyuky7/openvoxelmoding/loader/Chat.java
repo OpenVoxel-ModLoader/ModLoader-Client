@@ -42,7 +42,8 @@ final class Chat {
             if (a.length > 1) return Arrays.asList("1", "16", "64");
             List<String> ids = new ArrayList<>();
             for (Items.Item i : Items.ALL) ids.add(i.id);
-            for (BlockType b : BlockType.values()) if (b != BlockType.AIR && !b.hiddenFromInventory()) ids.add(b.name().toLowerCase());
+            for (BlockType b : BlockType.values()) if (b != BlockType.AIR && !b.hiddenFromInventory() && NativeBlocks.of(b) == null) ids.add(b.name().toLowerCase());
+            for (NativeBlocks.Def d : NativeBlocks.all()) ids.add(d.id());
             return ids;
         });
         ARGS.put("lang", a -> new ArrayList<>(Lang.available().keySet()));
