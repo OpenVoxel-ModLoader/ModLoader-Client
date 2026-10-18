@@ -25,7 +25,7 @@ final class Net {
     static volatile boolean managed;
     static volatile String serverVersion = "";
     static final List<String> SERVER_COMMANDS = new ArrayList<>();
-    private static final List<String> TAB = new ArrayList<>();
+    private static final List<String> TAB = new ArrayList<>(), TAB_NAMES = new ArrayList<>();
     private static String tabHeader = "", tabFooter = "";
     private static boolean helloSent;
     private static long helloNs;
@@ -43,11 +43,11 @@ final class Net {
 
     static void onWorldEnter(VoxelEngine e) {
         managed = false; serverVersion = ""; helloSent = false;
-        SERVER_COMMANDS.clear(); TAB.clear(); tabHeader = ""; tabFooter = "";
+        SERVER_COMMANDS.clear(); TAB.clear(); TAB_NAMES.clear(); tabHeader = ""; tabFooter = "";
         helloNs = System.nanoTime();
     }
 
-    static void onWorldExit() { managed = false; helloSent = false; TAB.clear(); SERVER_COMMANDS.clear(); }
+    static void onWorldExit() { managed = false; helloSent = false; TAB.clear(); TAB_NAMES.clear(); SERVER_COMMANDS.clear(); }
 
     /** Called every frame: sends the hello once the connection is up. */
     static void tick(VoxelEngine e) {
@@ -79,8 +79,9 @@ final class Net {
                     String[] parts = arg.split("\t", -1);
                     tabHeader = parts.length > 0 ? parts[0] : "";
                     tabFooter = parts.length > 1 ? parts[1] : "";
-                    TAB.clear();
+                    TAB.clear(); TAB_NAMES.clear();
                     if (parts.length > 2) for (String n : parts[2].split(",")) if (!n.isEmpty()) TAB.add(n);
+                    if (parts.length > 3) for (String n : parts[3].split(",")) if (!n.isEmpty()) TAB_NAMES.add(n);
                     break;
                 }
                 default: break;
@@ -104,7 +105,9 @@ final class Net {
 
     // ---- Tab list ----------------------------------------------------------------------
 
+    /** Plain player names (for completion). */
     static List<String> players() {
+        if (managed && !TAB_NAMES.isEmpty()) return TAB_NAMES;
         if (managed && !TAB.isEmpty()) return TAB;
         if (multiplayer()) return Chat.playerNames();
         List<String> me = new ArrayList<>();
@@ -115,7 +118,7 @@ final class Net {
 
     /** Minecraft-style player list while the key is held. 2D rendering must be set up. */
     static void renderPlayerList(int w, int h) {
-        List<String> names = players();
+        List<String> names = managed && !TAB.isEmpty() ? TAB : players();
         if (names.isEmpty()) return;
         String header = managed ? tabHeader : (multiplayer() ? Lang.t("tablist.server") : Lang.t("tablist.singleplayer"));
         String footer = managed ? tabFooter : Lang.t("tablist.count", names.size());
