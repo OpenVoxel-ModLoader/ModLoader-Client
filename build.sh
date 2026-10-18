@@ -2,7 +2,7 @@
 # Plain-javac build (no Gradle needed). Equivalent to: ./gradlew jar
 set -euo pipefail
 cd "$(dirname "$0")"
-OUT="dist/ModLoader-v1.0.0-vgame-0.0.8-client.jar"
+OUT="dist/ModLoader-v1.1.0-pre1-vgame-0.0.8-client.jar"
 GAME="${OPENVOXEL_GAME_JAR:-}"
 for c in ../../../Game/versions/0.0.8-Debug/openvoxel-0.0.8-Debug.jar ../../Game/versions/0.0.8-Debug/openvoxel-0.0.8-Debug.jar game/openvoxel.jar; do
   [ -z "$GAME" ] && [ -f "$c" ] && GAME="$c"

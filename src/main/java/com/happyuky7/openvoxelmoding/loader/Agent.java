@@ -10,7 +10,7 @@ import java.util.jar.JarFile;
 
 /** OpenVoxel ModLoader: java agent that adds the modding layer without touching the game JAR. */
 public final class Agent {
-    public static final String NAME = "OpenVoxel ModLoader", VERSION = "1.0.0", GAME_VERSION = "0.0.8";
+    public static final String NAME = "OpenVoxel ModLoader", VERSION = "1.1.0-pre1", GAME_VERSION = "0.0.8";
     private static final List<ClientMod> MODS = new ArrayList<>();
     private static final List<URLClassLoader> LOADERS = new ArrayList<>();
     private static final List<String> NAMES = new ArrayList<>();

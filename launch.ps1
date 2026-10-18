@@ -2,7 +2,7 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $root
-$jar = Join-Path $root 'dist\ModLoader-v1.0.0-vgame-0.0.8-client.jar'
+$jar = Join-Path $root 'dist\ModLoader-v1.1.0-pre1-vgame-0.0.8-client.jar'
 if (!(Test-Path $jar)) { & cmd /c build.bat; if ($LASTEXITCODE -ne 0) { throw 'Build failed' } }
 $home_ = $env:OPENVOXEL_HOME
 foreach ($c in @('..\..\..', '..\..', '..', '.')) { if (-not $home_ -and (Test-Path (Join-Path $root "$c\OpenVoxelLauncher.exe"))) { $home_ = (Resolve-Path (Join-Path $root $c)).Path } }
@@ -15,7 +15,7 @@ foreach ($d in 'mods','config','logs','lang','resourcepacks','sounds','music') {
 $env:OPENVOXEL_MODS_DIR = Join-Path $root 'instance'
 $env:JAVA_TOOL_OPTIONS = "-javaagent:$jar"
 Write-Host '============================================================'
-Write-Host ' OpenVoxel ModLoader 1.0.0 (game 0.0.8)'
+Write-Host ' OpenVoxel ModLoader 1.1.0-pre1 (game 0.0.8)'
 Write-Host ' EN: In the launcher select version "0.0.8-Debug" and press PLAY.'
 Write-Host ' ES: En el launcher selecciona la versión "0.0.8-Debug" y pulsa PLAY.'
 Write-Host " Mods: $env:OPENVOXEL_MODS_DIR\mods"
