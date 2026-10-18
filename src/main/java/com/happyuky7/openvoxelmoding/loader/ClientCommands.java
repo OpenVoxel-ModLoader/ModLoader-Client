@@ -41,19 +41,7 @@ final class ClientCommands {
             else if (sub.equals("model")) async(() -> ChatHud.addLine("&7" + Skins.uploadModel()));
             else ChatHud.addLine("&cUsage: /skin <reload|upload|model>");
         });
-        register("give", "<item|block> [count] - put an item in the selected hotbar slot", args -> {
-            if (args.length < 1) { ChatHud.addLine("&cUsage: /give <item id or block name>"); return; }
-            Items.Stack stack = null;
-            Items.Item item = Items.byId(args[0].toLowerCase());
-            if (item != null) stack = Items.Stack.of(item);
-            else if (NativeBlocks.type(args[0].toLowerCase()) != null) stack = Items.Stack.of(NativeBlocks.type(args[0].toLowerCase()));
-            else try { stack = Items.Stack.of(net.openvoxel.engine.world.block.BlockType.valueOf(args[0].toUpperCase())); } catch (Exception ignored) { }
-            if (stack == null) { ChatHud.addLine("&cUnknown item: " + args[0]); return; }
-            if (args.length > 1) try { stack.count = Math.max(1, Math.min(64, Integer.parseInt(args[1]))); } catch (NumberFormatException ignored) { }
-            BuiltinUI.HOTBAR[BuiltinUI.selected] = stack;
-            BuiltinUI.select(net.openvoxel.engine.VoxelEngine.getEngine(), BuiltinUI.selected);
-            ChatHud.addLine("&7Gave &e" + stack.name());
-        });
+        register("give", "[player] <item|block> [count] - give items (ops on ModLoader servers)", Give::command);
         register("lang", "<code> - switch language (en_us, es_es, ...)", args -> {
             if (args.length < 1) { ChatHud.addLine("&7Languages: &e" + String.join(", ", Lang.available().keySet())); return; }
             Settings.language = args[0];

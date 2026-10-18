@@ -193,5 +193,11 @@
   "kick.refused": "No responde nada en esa dirección: el servidor está apagado, el puerto es incorrecto o un firewall lo bloquea.",
   "kick.timeout": "El servidor no respondió a tiempo. Revisa la dirección y tu conexión.",
   "kick.unknownHost": "Esa dirección de servidor no existe. Revisa cómo está escrita en la lista de servidores.",
-  "kick.protocol.server": "Este servidor usa otra build de OpenVoxel distinta a la tuya. Tú estás en %s (protocolo %d), la que usa el ModLoader, así que el desactualizado es el servidor: pide a su dueño que lo actualice."
+  "kick.protocol.server": "Este servidor usa otra build de OpenVoxel distinta a la tuya. Tú estás en %s (protocolo %d), la que usa el ModLoader, así que el desactualizado es el servidor: pide a su dueño que lo actualice.",
+  "give.usage": "Uso: /give [jugador] <objeto> [cantidad]",
+  "give.unknown": "Objeto desconocido: %s",
+  "give.count": "No es un número: %s",
+  "give.done": "Dado %dx %s",
+  "give.dropped": "%d al suelo, inventario lleno",
+  "give.noperm": "/give solo funciona en creativo en servidores sin ModLoader."
 }

@@ -75,10 +75,17 @@ final class Net {
                 case "hello": managed = true; serverVersion = arg.trim(); System.out.println("[ModLoader] server has ModLoader " + serverVersion); break;
                 case "cmds": SERVER_COMMANDS.clear(); for (String c : arg.split(",")) if (!c.trim().isEmpty()) SERVER_COMMANDS.add(c.trim()); break;
                 case "gm": applyGameMode(arg.trim()); break;
+                case "give": {
+                    String[] g = arg.trim().split("\\s+");
+                    int n = 1;
+                    if (g.length > 1) try { n = Integer.parseInt(g[1]); } catch (NumberFormatException ignored) { }
+                    if (g.length > 0 && !g[0].isEmpty()) Give.give(g[0], n, true);
+                    break;
+                }
                 case "tab": {
                     String[] parts = arg.split("\t", -1);
-                    tabHeader = parts.length > 0 ? parts[0] : "";
-                    tabFooter = parts.length > 1 ? parts[1] : "";
+                    tabHeader = parts.length > 0 ? lines(parts[0]) : "";
+                    tabFooter = parts.length > 1 ? lines(parts[1]) : "";
                     TAB.clear(); TAB_NAMES.clear();
                     if (parts.length > 2) for (String n : parts[2].split(",")) if (!n.isEmpty()) TAB.add(n);
                     if (parts.length > 3) for (String n : parts[3].split(",")) if (!n.isEmpty()) TAB_NAMES.add(n);
@@ -89,6 +96,8 @@ final class Net {
         } catch (Throwable error) { System.err.println("[ModLoader] control message: " + error); }
         return true;
     }
+
+    private static String lines(String s) { return s.replace('\u0002', '\n').replace("\\n", "\n"); }
 
     private static void applyGameMode(String mode) {
         String m = mode.equals("creative") ? "creative" : "survival";
@@ -128,13 +137,20 @@ final class Net {
         for (String n : names) colW = Math.max(colW, GLUIRenderer.getTextWidth(n));
         colW += 28;
         float rowH = 22, pad = 10;
-        float width = Math.max(cols * colW + (cols - 1) * 4 + pad * 2, Math.max(GLUIRenderer.getTextWidth(header), GLUIRenderer.getTextWidth(footer)) + pad * 2);
+        String[] headerLines = header.isEmpty() ? new String[0] : header.split("\n", -1);
+        String[] footerLines = footer.isEmpty() ? new String[0] : footer.split("\n", -1);
+        float textW = 0;
+        for (String l : headerLines) textW = Math.max(textW, GLUIRenderer.getTextWidth(l));
+        for (String l : footerLines) textW = Math.max(textW, GLUIRenderer.getTextWidth(l));
+        float lineH = 22;
+        float width = Math.max(cols * colW + (cols - 1) * 4 + pad * 2, textW + pad * 2);
         width = Math.max(width, 220);
-        float height = pad + (header.isEmpty() ? 0 : 26) + rows * rowH + (footer.isEmpty() ? 0 : 26) + pad;
+        float height = pad + headerLines.length * lineH + (headerLines.length > 0 ? 4 : 0) + rows * rowH + (footerLines.length > 0 ? 4 : 0) + footerLines.length * lineH + pad;
         float x = (w - width) / 2f, y = 10;
         GLUIRenderer.drawPanel(x, y, width, height, 0, 0, 0, 0.55f);
         float cy = y + pad;
-        if (!header.isEmpty()) { Mc.centered(header, w / 2f, cy + 16, Mc.TEXT); cy += 26; }
+        for (String l : headerLines) { Mc.centered(l, w / 2f, cy + 16, Mc.TEXT); cy += lineH; }
+        if (headerLines.length > 0) cy += 4;
         float gx = x + (width - (cols * colW + (cols - 1) * 4)) / 2f;
         for (int i = 0; i < names.size(); i++) {
             int c = i / rows, r = i % rows;
@@ -144,7 +160,8 @@ final class Net {
             Mc.text(names.get(i), nx + 22, ny + 15, Mc.TEXT);
         }
         cy += rows * rowH;
-        if (!footer.isEmpty()) Mc.centered(footer, w / 2f, cy + 16, Mc.TEXT_DIM);
+        if (footerLines.length > 0) cy += 4;
+        for (String l : footerLines) { Mc.centered(l, w / 2f, cy + 16, Mc.TEXT_DIM); cy += lineH; }
     }
 
     static boolean listKeyDown() {

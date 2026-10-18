@@ -39,7 +39,7 @@ final class Chat {
         Function<String[], List<String>> modes = a -> a.length <= 1 ? Arrays.asList("creative", "survival") : playerNames();
         ARGS.put("gamemode", modes); ARGS.put("gm", modes);
         ARGS.put("give", a -> {
-            if (a.length > 1) return Arrays.asList("1", "16", "64");
+            if (a.length > 1 && Give.resolve(a[a.length - 2]) != null) return Arrays.asList("1", "16", "64");
             List<String> ids = new ArrayList<>();
             for (Items.Item i : Items.ALL) ids.add(i.id);
             for (BlockType b : BlockType.values()) if (b != BlockType.AIR && !b.hiddenFromInventory() && NativeBlocks.of(b) == null) ids.add(b.name().toLowerCase());

@@ -193,5 +193,11 @@
   "kick.refused": "Nothing answered at that address: the server is off, the port is wrong or a firewall blocks it.",
   "kick.timeout": "The server did not answer in time. Check the address and your connection.",
   "kick.unknownHost": "That server address does not exist. Check the spelling in the server list.",
-  "kick.protocol.server": "This server runs a different OpenVoxel build than yours. You are on %s (protocol %d), the one ModLoader uses, so the server is the one out of date: ask its owner to update it."
+  "kick.protocol.server": "This server runs a different OpenVoxel build than yours. You are on %s (protocol %d), the one ModLoader uses, so the server is the one out of date: ask its owner to update it.",
+  "give.usage": "Usage: /give [player] <item> [count]",
+  "give.unknown": "Unknown item: %s",
+  "give.count": "Not a number: %s",
+  "give.done": "Gave %dx %s",
+  "give.dropped": "%d dropped, inventory full",
+  "give.noperm": "/give only works in creative on servers without ModLoader."
 }
