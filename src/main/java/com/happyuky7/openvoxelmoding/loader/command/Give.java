@@ -3,10 +3,8 @@ package com.happyuky7.openvoxelmoding.loader.command;
 import com.happyuky7.openvoxelmoding.loader.Lang;
 import com.happyuky7.openvoxelmoding.loader.NativeBlocks;
 
-
-
-
 import com.happyuky7.openvoxelmoding.loader.core.Settings;
+import com.happyuky7.openvoxelmoding.loader.gameplay.Cheats;
 import com.happyuky7.openvoxelmoding.loader.item.Drops;
 import com.happyuky7.openvoxelmoding.loader.item.Items;
 import com.happyuky7.openvoxelmoding.loader.net.Net;
@@ -35,6 +33,7 @@ public final class Give {
         int i = 0;
         if (args.length >= 2 && resolve(args[0]) == null && resolve(args[1]) != null) i = 1;
         if (Net.multiplayer() && !Settings.isCreative()) { ChatHud.addLine("&c" + Lang.t("give.noperm")); return; }
+        if (!Cheats.allowed()) { ChatHud.addLine("&c" + Lang.t("cheats.off")); return; }
         int count = 1;
         if (args.length > i + 1) try { count = Integer.parseInt(args[i + 1]); } catch (NumberFormatException ex) { ChatHud.addLine("&c" + Lang.t("give.count", args[i + 1])); return; }
         give(args[i], count, true);

@@ -2,10 +2,6 @@ package com.happyuky7.openvoxelmoding.loader.core;
 
 import com.happyuky7.openvoxelmoding.loader.Lang;
 
-
-
-
-
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

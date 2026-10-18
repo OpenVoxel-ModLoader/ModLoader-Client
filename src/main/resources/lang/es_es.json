@@ -199,5 +199,9 @@
   "give.count": "No es un número: %s",
   "give.done": "Dado %dx %s",
   "give.dropped": "%d al suelo, inventario lleno",
-  "give.noperm": "/give solo funciona en creativo en servidores sin ModLoader."
+  "give.noperm": "/give solo funciona en creativo en servidores sin ModLoader.",
+  "cheats.off": "Los trucos están desactivados en este mundo. Actívalos en el menú de pausa (Esc).",
+  "pause.cheats": "Trucos: %s",
+  "pause.needcheats": "Requiere trucos",
+  "pause.mode": "Modo: %s"
 }

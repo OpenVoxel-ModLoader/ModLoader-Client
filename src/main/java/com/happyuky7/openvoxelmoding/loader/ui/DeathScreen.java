@@ -2,9 +2,6 @@ package com.happyuky7.openvoxelmoding.loader.ui;
 
 import com.happyuky7.openvoxelmoding.loader.Lang;
 
-
-
-
 import com.happyuky7.openvoxelmoding.loader.core.Settings;
 import com.happyuky7.openvoxelmoding.loader.gameplay.Survival;
 

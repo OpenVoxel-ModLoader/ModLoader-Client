@@ -2,9 +2,6 @@ package com.happyuky7.openvoxelmoding.loader.ui;
 
 import com.happyuky7.openvoxelmoding.loader.Lang;
 
-
-
-
 import com.happyuky7.openvoxelmoding.loader.audio.Music;
 import com.happyuky7.openvoxelmoding.loader.core.Agent;
 import com.happyuky7.openvoxelmoding.loader.core.GameBuild;
@@ -13,6 +10,7 @@ import com.happyuky7.openvoxelmoding.loader.cosmetics.Capes;
 import com.happyuky7.openvoxelmoding.loader.cosmetics.Skins;
 import com.happyuky7.openvoxelmoding.loader.crafting.RecipeBook;
 import com.happyuky7.openvoxelmoding.loader.crafting.Recipes;
+import com.happyuky7.openvoxelmoding.loader.gameplay.Cheats;
 import com.happyuky7.openvoxelmoding.loader.gameplay.GameMode;
 import com.happyuky7.openvoxelmoding.loader.gameplay.Survival;
 import com.happyuky7.openvoxelmoding.loader.item.Containers;
@@ -137,9 +135,17 @@ public final class Screens {
         list.add(new McButton(cx - bw / 2, y, bw, bh, t("pause.back"), b -> screen.close()));
         list.add(new McButton(cx - bw / 2, y + (bh + gap), half, bh, t("pause.mods"), b -> UIManager.get().openGUI(new ModsScreen(cam, iw, ih))));
         list.add(new McButton(cx + gap / 2, y + (bh + gap), half, bh, t("menu.options"), b -> UIManager.get().openGUI(new SettingsScreen(cam, iw, ih))));
-        list.add(new McButton(cx - bw / 2, y + 2 * (bh + gap), bw, bh, t("pause.gamemode", GameMode.label()), b -> {
+        boolean sp = Cheats.singleplayer();
+        float modeW = sp ? half : bw;
+        String modeKey = sp ? "pause.mode" : "pause.gamemode";
+        list.add(new McButton(cx - bw / 2, y + 2 * (bh + gap), modeW, bh, t(modeKey, GameMode.label()), b -> {
+            if (!Cheats.allowed()) { b.setText(t("pause.needcheats")); return; }
             GameMode.set(Settings.isCreative() ? "survival" : "creative");
-            b.setText(t("pause.gamemode", GameMode.label()));
+            b.setText(t(modeKey, GameMode.label()));
+        }));
+        if (sp) list.add(new McButton(cx + gap / 2, y + 2 * (bh + gap), half, bh, t("pause.cheats", onOff(Cheats.allowed())), b -> {
+            Cheats.set(!Cheats.allowed());
+            b.setText(t("pause.cheats", onOff(Cheats.allowed())));
         }));
         list.add(new McButton(cx - bw / 2, y + 3 * (bh + gap), half, bh, t("menu.skin"), b -> UIManager.get().openGUI(new SkinScreen(cam, iw, ih))));
         list.add(new McButton(cx + gap / 2, y + 3 * (bh + gap), half, bh, t("menu.account"), b -> UIManager.get().openGUI(new AccountScreen(cam, iw, ih))));

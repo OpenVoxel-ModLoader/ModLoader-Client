@@ -199,5 +199,9 @@
   "give.count": "Not a number: %s",
   "give.done": "Gave %dx %s",
   "give.dropped": "%d dropped, inventory full",
-  "give.noperm": "/give only works in creative on servers without ModLoader."
+  "give.noperm": "/give only works in creative on servers without ModLoader.",
+  "cheats.off": "Cheats are off in this world. Turn them on in the pause menu (Esc).",
+  "pause.cheats": "Cheats: %s",
+  "pause.needcheats": "Needs cheats",
+  "pause.mode": "Mode: %s"
 }

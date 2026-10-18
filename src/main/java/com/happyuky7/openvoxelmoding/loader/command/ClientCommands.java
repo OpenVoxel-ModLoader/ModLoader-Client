@@ -6,11 +6,9 @@ import com.happyuky7.openvoxelmoding.loader.gameplay.Mobs;
 import com.happyuky7.openvoxelmoding.loader.ui.BuiltinUI;
 import com.happyuky7.openvoxelmoding.loader.audio.Music;
 
-
-
-
 import com.happyuky7.openvoxelmoding.loader.core.Settings;
 import com.happyuky7.openvoxelmoding.loader.cosmetics.Skins;
+import com.happyuky7.openvoxelmoding.loader.gameplay.Cheats;
 import com.happyuky7.openvoxelmoding.loader.gameplay.GameMode;
 
 import net.openvoxel.engine.ui.ChatHud;
@@ -37,6 +35,7 @@ public final class ClientCommands {
     static {
         register("gamemode", "<creative|survival> - switch game mode (double-tap space to fly)", args -> {
             if (args.length < 1) { ChatHud.addLine("&cUsage: /gamemode <creative|survival>"); return; }
+            if (!Cheats.allowed()) { ChatHud.addLine("&c" + Lang.t("cheats.off")); return; }
             String m = args[0].toLowerCase();
             if (m.equals("c") || m.equals("creative") || m.equals("1")) GameMode.set("creative");
             else if (m.equals("s") || m.equals("survival") || m.equals("0")) GameMode.set("survival");
